@@ -399,6 +399,26 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+          {/* Dashboard Header with Filter */}
+          <div className="flex items-center justify-between shrink-0 px-2">
+            <div>
+              <h3 className="text-xl font-black text-gray-900">조직 예산 및 인원 현황</h3>
+              <p className="text-xs text-gray-400 font-bold">선택한 부서의 실시간 예산 사용률과 사원 정보를 확인합니다.</p>
+            </div>
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
+              <Filter size={16} className="text-gray-400" />
+              <span className="text-xs font-black text-gray-400 uppercase tracking-tighter mr-2">부서 필터</span>
+              <select 
+                className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                value={dbDeptFilter} 
+                onChange={(e) => setDbDeptFilter(e.target.value)}
+              >
+                <option value="전체">회사 전체</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
           {/* Budget Widget Row */}
           <div className="grid grid-cols-12 gap-6 shrink-0">
             <div className="col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
@@ -453,13 +473,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 <div className="relative group">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
                   <input type="text" placeholder="성명 검색..." className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none w-64 text-sm font-medium shadow-sm" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
-                </div>
-                <div className="flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                  <Filter size={16} className="ml-2 text-gray-400" />
-                  <select className="text-sm font-bold text-gray-600 outline-none pr-2 bg-transparent" value={dbDeptFilter} onChange={(e) => setDbDeptFilter(e.target.value)}>
-                    <option value="전체">전체 부서</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
                 </div>
               </div>
             </div>
