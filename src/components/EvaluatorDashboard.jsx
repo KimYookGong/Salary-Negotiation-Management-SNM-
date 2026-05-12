@@ -55,6 +55,71 @@ const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
   );
 };
 
+const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }) => {
+  const [offer, setOffer] = useState('');
+  const [comment, setComment] = useState('');
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl p-10 w-full max-w-lg shadow-2xl relative z-10 border border-gray-100"
+      >
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h3 className="text-2xl font-black text-gray-900 mb-1">조건 역제시</h3>
+            <p className="text-sm text-gray-400 font-bold">{name}님의 요구안에 대한 역제시안을 작성합니다.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
+            <X size={24} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="space-y-6">
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">현재 요구안</p>
+            <p className="text-lg font-black text-gray-900">{currentProposal}</p>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">역제시 연봉/조건</label>
+            <input 
+              type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
+              placeholder="예: 7,200만원" value={offer} onChange={(e) => setOffer(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">검토 의견</label>
+            <textarea 
+              className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 h-32 text-sm font-medium"
+              placeholder="역제시 사유 및 추가 검토 의견을 입력하세요."
+              value={comment} onChange={(e) => setComment(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-10">
+          <button onClick={onClose} className="flex-1 py-4 text-sm font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">취소</button>
+          <button 
+            onClick={() => onConfirm(offer, comment)}
+            className="flex-2 py-4 px-8 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            역제시안 전송
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetData }) => {
   const [proposedRating, setProposedRating] = useState(employee?.performance_rating || 'A');
   const [proposedSalary, setProposedSalary] = useState('');
@@ -216,29 +281,47 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [selectedNegotiation, setSelectedNegotiation] = useState(null);
 
   const fetchData = async () => {
-    setLoading(true);
-    
-    const { data: negs } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
-    if (negs) setNegotiations(negs);
+    try {
+      setLoading(true);
+      
+      const { data: negs, error: negsError } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
+      if (negsError) throw negsError;
+      if (negs) setNegotiations(negs);
 
-    const { data: emps } = await supabase.from('employees').select('*');
-    if (emps) setEmployees(emps);
+      const { data: emps, error: empsError } = await supabase.from('employees').select('*');
+      if (empsError) throw empsError;
+      if (emps) setEmployees(emps);
 
-    const { data: companyBudget } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
-    const { data: deptBudgets } = await supabase.from('department_budgets').select('*');
-    
-    // 더미 데이터 초기화 (데이터가 없을 경우)
-    if (!companyBudget) {
-      await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]);
+      const { data: companyBudget, error: budgetError } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
+      // Error handling for budgets will be handled below if null
+      
+      const { data: deptBudgets, error: deptError } = await supabase.from('department_budgets').select('*');
+      if (deptError) throw deptError;
+      
+      // 더미 데이터 초기화 (데이터가 없을 경우)
+      if (!companyBudget || budgetError) {
+        console.log('Initializing dummy company budget...');
+        const { data: newBudget } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
+        setBudgets(prev => ({ ...prev, company: newBudget }));
+      } else {
+        setBudgets(prev => ({ ...prev, company: companyBudget }));
+      }
+
+      if (!deptBudgets || deptBudgets.length === 0) {
+        console.log('Initializing dummy department budgets...');
+        const depts = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
+        const dummyDepts = depts.map(d => ({ department_name: d, total_budget: 200000000, used_budget: 0 }));
+        const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
+        setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
+      } else {
+        setBudgets(prev => ({ ...prev, depts: deptBudgets }));
+      }
+
+    } catch (error) {
+      console.error('Error fetching data in EvaluatorDashboard:', error);
+    } finally {
+      setLoading(false);
     }
-    if (!deptBudgets || deptBudgets.length === 0) {
-      const depts = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
-      const dummyDepts = depts.map(d => ({ department_name: d, total_budget: 200000000, used_budget: 0 }));
-      await supabase.from('department_budgets').upsert(dummyDepts);
-    }
-
-    setBudgets({ company: companyBudget, depts: deptBudgets || [] });
-    setLoading(false);
   };
 
   useEffect(() => {

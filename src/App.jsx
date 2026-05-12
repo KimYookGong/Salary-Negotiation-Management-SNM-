@@ -13,31 +13,56 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (!error && data) {
-      setProfile(data);
-      setUserRole(data.role || 'evaluatee');
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.warn('Profile not found for user:', userId);
+          // 프로필이 없는 경우 기본값 설정 또는 다른 처리
+          setUserRole('evaluatee'); 
+        } else {
+          throw error;
+        }
+      } else if (data) {
+        setProfile(data);
+        setUserRole(data.role || 'evaluatee');
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
     }
   };
 
   React.useEffect(() => {
     // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id);
-      setLoading(false);
-    });
+    const initializeAuth = async () => {
+      setLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        if (session) {
+          await fetchProfile(session.user.id);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-        fetchProfile(session.user.id);
+        setLoading(true);
+        await fetchProfile(session.user.id);
+        setLoading(false);
       } else {
         setProfile(null);
       }
