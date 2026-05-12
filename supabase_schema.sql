@@ -91,8 +91,6 @@ ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Budgets are viewable by everyone" ON budgets;
 CREATE POLICY "Allow all actions for now" ON budgets FOR ALL USING (true);
 
-
-
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can see their own notifications" ON notifications;
 CREATE POLICY "Users can see their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);

@@ -153,6 +153,12 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       return matchSearch && matchDept;
     })
     .sort((a, b) => {
+      if (sortConfig.key === 'performance_rating') {
+        const ratingOrder = { 'S': 1, 'A': 2, 'B': 3, 'C': 4, 'D': 5 };
+        const valA = ratingOrder[a[sortConfig.key]] || 99;
+        const valB = ratingOrder[b[sortConfig.key]] || 99;
+        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
       if (a[sortConfig.key] < b[sortConfig.key]) {
         return sortConfig.direction === 'asc' ? -1 : 1;
       }
@@ -186,9 +192,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-gray-50/30">
             <div>
               <h3 className="text-2xl font-black text-[var(--color-primary)] mb-1 flex items-center gap-2">
-                <Users size={24} /> 전체 사원 현황
+                <Users size={24} /> 사원 현황
               </h3>
-              <p className="text-sm text-gray-400 font-bold">총 {employees.length}명의 인사 데이터 통합 관리</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="relative group">
@@ -262,6 +267,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                         emp.performance_rating === 'S' ? 'bg-purple-50 text-purple-600 border-purple-100' :
                         emp.performance_rating === 'A' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                         emp.performance_rating === 'B' ? 'bg-green-50 text-green-600 border-green-100' :
+                        emp.performance_rating === 'C' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                        emp.performance_rating === 'D' ? 'bg-red-50 text-red-600 border-red-100' :
                         'bg-gray-50 text-gray-400 border-gray-100'
                       }`}>
                         {emp.performance_rating || '-'}
