@@ -1,4 +1,8 @@
+import React, { useState } from 'react';
 import { supabase } from './supabaseClient';
+import Layout from './components/Layout';
+import EvaluateeDashboard from './components/EvaluateeDashboard';
+import EvaluatorDashboard from './components/EvaluatorDashboard';
 import Auth from './components/Auth';
 
 function App() {
