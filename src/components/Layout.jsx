@@ -13,6 +13,7 @@ import {
   TrendingUp,
   RefreshCw
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
   <div 
@@ -29,6 +30,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
 
 const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profile }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
@@ -88,10 +90,54 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
           
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
-              <button className="relative text-[var(--text-muted)] hover:text-[var(--color-primary)] p-2">
-                <Bell size={20} />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
-              </button>
+              <div className="relative">
+                <button 
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className="relative text-[var(--text-muted)] hover:text-[var(--color-primary)] p-2 transition-colors"
+                >
+                  <Bell size={20} />
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
+                </button>
+
+                <AnimatePresence>
+                  {showNotifications && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={() => setShowNotifications(false)}
+                      ></div>
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden z-50"
+                      >
+                        <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                          <h4 className="font-black text-sm text-[var(--color-primary)]">최근 알림</h4>
+                          <span className="text-[10px] bg-[var(--color-primary)] text-white px-2 py-0.5 rounded-full font-bold">New</span>
+                        </div>
+                        <div className="max-h-[400px] overflow-y-auto">
+                          {[1, 2, 3].map((_, i) => (
+                            <div key={i} className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors last:border-0">
+                              <p className="text-xs font-bold text-[var(--text-main)] mb-1">
+                                {i === 0 ? "권지민 주임님이 거절됨 상태입니다." : i === 1 ? "새로운 협상 요청이 도착했습니다." : "이준영 대리님의 협상이 완료되었습니다."}
+                              </p>
+                              <p className="text-[10px] text-[var(--text-muted)] uppercase font-medium">
+                                2026. 5. 12. 오후 2:54:54
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="p-3 bg-gray-50/50 text-center">
+                          <button className="text-[10px] font-black text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors">
+                            모든 알림 보기
+                          </button>
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
               
               <div className="flex items-center gap-3 pl-4 border-l border-[var(--border-color)]">
                 <div className="text-right hidden sm:block">

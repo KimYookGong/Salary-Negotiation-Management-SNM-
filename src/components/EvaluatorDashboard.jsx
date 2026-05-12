@@ -160,9 +160,9 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                     <p className="text-[11px] font-black text-[var(--text-muted)] uppercase mb-2 tracking-widest">요구안</p>
                     <p className="text-3xl font-black text-[var(--color-primary)]">{selectedNegotiation.evaluatee_proposal}</p>
                   </div>
-                  <div className="text-right">
+                    <div className="text-right shrink-0">
                     <p className="text-[11px] font-black text-[var(--text-muted)] uppercase mb-2 tracking-widest">상태</p>
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-black ${statusMap[selectedNegotiation.status]?.className}`}>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black whitespace-nowrap ${statusMap[selectedNegotiation.status]?.className}`}>
                       {statusMap[selectedNegotiation.status]?.label}
                     </span>
                   </div>
@@ -194,10 +194,10 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
               <div className="card shadow-xl">
                 <h3 className="text-lg font-black mb-5 flex items-center gap-2 text-[var(--color-primary)]">
                   <FileText size={22} />
-                  직무 기술서 (JD)
+                  직무 기술서
                 </h3>
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap font-medium min-h-[100px]">
+                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap font-medium min-h-[250px]">
                     {selectedNegotiation.jd || '등록된 JD 정보가 없습니다.'}
                   </p>
                 </div>
@@ -209,7 +209,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   성과 요약 및 근거
                 </h3>
                 <div className="bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap font-medium min-h-[100px]">
+                  <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap font-medium min-h-[250px]">
                     {selectedNegotiation.reason || '등록된 성과 정보가 없습니다.'}
                   </p>
                 </div>
@@ -250,16 +250,16 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8 space-y-8">
-              {/* 대시보드 보강: 부서별 협상 현황 차트 대용 UI */}
+          <div className="lg:col-span-12 space-y-8">
+            {/* 대시보드 보강: 부서별 협상 현황 차트 대용 UI */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="card shadow-xl border-none">
                 <h3 className="text-xl font-black mb-8 flex items-center gap-2">
                   <TrendingUp size={24} className="text-[var(--color-primary)]" />
                   부서별 협상 진행도
                 </h3>
                 <div className="space-y-6">
-                  {['개발팀', '인사팀', '마케팅팀', '디자인팀'].map(dept => {
+                  {['개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀'].map(dept => {
                     const deptNegs = negotiations.filter(n => n.department === dept);
                     const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
                     const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
@@ -282,15 +282,15 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 </div>
               </div>
 
-              <div className="card p-0 overflow-hidden border-none shadow-2xl">
+              <div className="card p-0 overflow-hidden border-none shadow-2xl flex flex-col">
                 <div className="p-8 bg-white border-b border-gray-50 flex justify-between items-center">
                   <h3 className="text-xl font-black text-[var(--color-primary)] flex items-center gap-2">
                     <Bell size={24} className="text-[var(--color-accent-2)]" />
                     실시간 협상 알림
                   </h3>
                 </div>
-                <div className="p-4 space-y-2">
-                  {negotiations.slice(0, 5).map((neg, i) => (
+                <div className="p-4 space-y-2 overflow-y-auto max-h-[600px]">
+                  {negotiations.slice(0, 8).map((neg, i) => (
                     <div key={i} className="flex items-center gap-4 p-5 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group">
                       <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-all">
                         {neg.status === 'submitted' ? <AlertCircle size={20} className="text-orange-500" /> : <Clock size={20} />}
@@ -306,23 +306,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                       <ChevronRight size={18} className="text-gray-300 group-hover:text-[var(--color-primary)] transition-all" />
                     </div>
                   ))}
-                </div>
-              </div>
-            </div>
-
-            {/* 대시보드 우측 패널 */}
-            <div className="lg:col-span-4 space-y-6">
-              <div className="card bg-[var(--color-secondary)] text-white border-none shadow-xl">
-                <h4 className="text-lg font-black mb-4">공지사항</h4>
-                <div className="space-y-4">
-                  <div className="p-4 bg-white/10 rounded-xl text-sm border border-white/10">
-                    <p className="font-bold mb-1">상반기 연봉협상 마감 안내</p>
-                    <p className="opacity-70 text-xs">2026-06-30일까지 모든 협상을 완료해 주세요.</p>
-                  </div>
-                  <div className="p-4 bg-white/10 rounded-xl text-sm border border-white/10">
-                    <p className="font-bold mb-1">시스템 정기 점검</p>
-                    <p className="opacity-70 text-xs">금주 토요일 오전 2시 ~ 4시</p>
-                  </div>
                 </div>
               </div>
             </div>
@@ -357,7 +340,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 <tr>
                   <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">대상자 정보</th>
                   <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">현재 진행 상태</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">희망 연봉</th>
+                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">희망 연봉 및 조건</th>
                   <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">최종 업데이트</th>
                   <th className="px-10 py-6 text-right text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">상세 보기</th>
                 </tr>
