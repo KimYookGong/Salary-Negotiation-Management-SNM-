@@ -24,7 +24,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const EvaluateeDashboard = () => {
+const EvaluateeDashboard = ({ profile }) => {
   const [negotiation, setNegotiation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -34,13 +34,13 @@ const EvaluateeDashboard = () => {
   });
 
   const fetchNegotiation = async () => {
+    if (!profile) return;
     setLoading(true);
-    // 데모를 위해 '홍길동'의 데이터를 가져옵니다. 
-    // 실제 앱에서는 로그인된 사용자의 ID를 사용해야 합니다.
+    
     const { data, error } = await supabase
       .from('negotiations')
       .select('*')
-      .eq('evaluatee_name', '홍길동')
+      .eq('evaluatee_id', profile.id)
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -58,12 +58,15 @@ const EvaluateeDashboard = () => {
 
   React.useEffect(() => {
     fetchNegotiation();
-  }, []);
+  }, [profile]);
 
   const handleSubmit = async () => {
+    if (!profile) return;
+
     const payload = {
-      evaluatee_name: '홍길동',
-      department: '개발팀', // 실제로는 사용자 정보에서 가져와야 함
+      evaluatee_id: profile.id,
+      evaluatee_name: profile.full_name,
+      department: profile.department,
       jd: formData.jd,
       evaluatee_proposal: formData.proposal,
       reason: formData.reason,

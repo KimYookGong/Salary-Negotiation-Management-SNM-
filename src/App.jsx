@@ -56,7 +56,9 @@ function App() {
 
   const renderContent = () => {
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
-      return userRole === 'evaluator' ? <EvaluatorDashboard /> : <EvaluateeDashboard />;
+      return userRole === 'evaluator' 
+        ? <EvaluatorDashboard profile={profile} currentTab={currentTab} /> 
+        : <EvaluateeDashboard profile={profile} />;
     }
     
     return (

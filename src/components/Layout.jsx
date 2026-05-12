@@ -75,12 +75,6 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
         </nav>
 
         <div className="p-4 border-t border-white/10 space-y-2">
-          <SidebarItem 
-            icon={LogOut} 
-            label="로그아웃" 
-            collapsed={collapsed} 
-            onClick={() => supabase.auth.signOut()}
-          />
         </div>
       </aside>
 
