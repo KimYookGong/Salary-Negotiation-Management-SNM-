@@ -75,15 +75,6 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
         </nav>
 
         <div className="p-4 border-t border-white/10 space-y-2">
-          {/* Role Switcher moved to sidebar bottom as per request */}
-          <button 
-            onClick={() => setCurrentTab('switch-role')}
-            className="w-full flex items-center gap-4 p-3 rounded-lg text-white/60 hover:bg-white/5 hover:text-white transition-all"
-            title={collapsed ? "모드 전환" : ""}
-          >
-            <RefreshCw size={20} />
-            {!collapsed && <span className="text-sm font-medium">평가자 모드로 전환</span>}
-          </button>
           <SidebarItem 
             icon={LogOut} 
             label="로그아웃" 

@@ -140,16 +140,18 @@ const EvaluatorDashboard = () => {
     }
   };
 
+  const stats = [
+    { label: '전체 검토 대상', value: `${negotiations.length}명`, icon: Users, color: 'var(--color-secondary)' },
+    { label: '승인 대기', value: `${negotiations.filter(n => n.status === 'submitted').length}건`, icon: MessageSquare, color: 'var(--color-accent-2)' },
+    { label: '최종 합의 완료', value: `${negotiations.filter(n => n.status === 'final_agreement').length}건`, icon: Check, color: 'var(--color-accent-1)' },
+    { label: '참여 부서', value: `${new Set(negotiations.map(n => n.department)).size}개`, icon: ArrowUpRight, color: 'var(--color-primary)' },
+  ];
+
   return (
     <div className="space-y-8 w-full max-w-[1600px] mx-auto">
-      {/* Stats Overview - 4 columns in a row */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: '전체 검토 대상', value: '12명', icon: Users, color: 'var(--color-secondary)' },
-          { label: '승인 대기', value: '5건', icon: MessageSquare, color: 'var(--color-accent-2)' },
-          { label: '최종 합의 완료', value: '7건', icon: Check, color: 'var(--color-accent-1)' },
-          { label: '평균 인상률', value: '7.2%', icon: ArrowUpRight, color: 'var(--color-primary)' },
-        ].map((stat, i) => (
+        {stats.map((stat, i) => (
           <div key={i} className="card flex items-center gap-4 hover:shadow-lg transition-shadow">
             <div className="p-3 rounded-xl flex-shrink-0" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
               <stat.icon size={24} />

@@ -1,6 +1,7 @@
+-- 1. 연봉 협상 테이블
 CREATE TABLE IF NOT EXISTS negotiations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  evaluatee_id UUID REFERENCES auth.users(id), -- 연동을 위해 추가
+  evaluatee_id UUID REFERENCES auth.users(id),
   evaluatee_name TEXT NOT NULL,
   department TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'submitted',
@@ -14,14 +15,22 @@ CREATE TABLE IF NOT EXISTS negotiations (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 사용자 프로필 테이블 생성
+-- 2. 사용자 프로필 테이블
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
   department TEXT,
   employee_id TEXT,
-  role TEXT DEFAULT 'evaluatee', -- 'evaluatee', 'evaluator'
+  role TEXT DEFAULT 'evaluatee',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 3. 사원 인증용 마스터 테이블
+CREATE TABLE IF NOT EXISTS employees (
+  employee_id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  department TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- RLS 설정
@@ -33,9 +42,12 @@ CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (
 CREATE POLICY "Users can update their own profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Users can insert their own profiles" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
--- 더미 데이터 삽입 (생략 가능)
-INSERT INTO negotiations (evaluatee_name, department, status, evaluatee_proposal, score)
-VALUES 
-('홍길동', '개발팀', 'submitted', '₩75,000,000', 4.8),
-('이영희', '디자인팀', 'under_review', '₩68,000,000', 4.5),
-('김철수', '마케팅팀', 'counter_offer', '₩62,000,000', 4.2);
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Employees are viewable by everyone" ON employees FOR SELECT USING (true);
+
+-- 4. 사전 등록 사원 데이터 (테스트용)
+INSERT INTO employees (employee_id, full_name, department) VALUES 
+('HR202601', '관리자', '인사팀'),
+('DEV202601', '홍길동', '개발팀'),
+('DEV202602', '김철수', '개발팀'),
+('DS202601', '이영희', '디자인팀');

@@ -20,34 +20,54 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        const { data, error: authError } = await supabase.auth.signUp({
+        // 1. 사원 마스터 테이블에서 정보 일치 여부 확인
+        const { data: employee, error: empError } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .eq('full_name', fullName)
+          .eq('department', department)
+          .single();
+
+        if (empError || !employee) {
+          throw new Error('사원 정보가 일치하지 않습니다. 이름, 부서, 사번을 다시 확인해주세요.');
+        }
+
+        // 2. 인사팀 여부에 따라 역할 설정
+        const assignedRole = department === '인사팀' ? 'evaluator' : 'evaluatee';
+
+        // 3. Supabase Auth 가입
+        const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: {
             data: {
               full_name: fullName,
               department: department,
-              employee_id: employeeId
+              employee_id: employeeId,
+              role: assignedRole
             }
           }
         });
         if (authError) throw authError;
 
-        if (data.user) {
+        // 4. 프로필 생성
+        if (authData.user) {
           const { error: profileError } = await supabase
             .from('profiles')
             .insert([
               { 
-                id: data.user.id, 
+                id: authData.user.id, 
                 full_name: fullName, 
                 department: department, 
-                employee_id: employeeId 
+                employee_id: employeeId,
+                role: assignedRole
               }
             ]);
           if (profileError) console.error('Profile creation error:', profileError);
         }
 
-        setMessage({ type: 'success', text: '회원가입 확인 메일을 보냈습니다. (인증이 비활성화된 경우 바로 로그인 가능)' });
+        setMessage({ type: 'success', text: '회원가입 확인 메일을 보냈습니다. (인증 비활성화 시 바로 로그인 가능)' });
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
