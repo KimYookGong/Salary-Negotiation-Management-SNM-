@@ -35,6 +35,7 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
   }, [session]);
 
   const menuItems = [
+    { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'negotiation', label: userRole === 'evaluator' ? '협상 관리' : '연봉 협상', icon: MessageSquare },
   ];
 

@@ -9,7 +9,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [userRole, setUserRole] = useState('evaluator'); // 'evaluatee' or 'evaluator'
-  const [currentTab, setCurrentTab] = useState('negotiation');
+  const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId) => {
