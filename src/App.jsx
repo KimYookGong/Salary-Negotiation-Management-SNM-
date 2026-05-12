@@ -38,44 +38,65 @@ function App() {
   };
 
   React.useEffect(() => {
-    // Check active sessions and sets the user
-    const initializeAuth = async () => {
-      setLoading(true);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        if (session) {
-          await fetchProfile(session.user.id);
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error);
-      } finally {
+    let mounted = true;
+
+    // 안전장치: 6초 후에는 무조건 로딩 해제
+    const timer = setTimeout(() => {
+      if (mounted) {
+        console.warn('Loading safety timeout reached');
         setLoading(false);
+      }
+    }, 6000);
+
+    const initialize = async () => {
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
+        setSession(initialSession);
+        if (initialSession) {
+          await fetchProfile(initialSession.user.id);
+        }
+      } catch (err) {
+        console.error('Initialization error:', err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          clearTimeout(timer);
+        }
       }
     };
 
-    initializeAuth();
+    initialize();
 
-    // Listen for changes on auth state (logged in, signed out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
       setSession(session);
       if (session) {
-        setLoading(true);
-        await fetchProfile(session.user.id);
-        setLoading(false);
+        if (event === 'SIGNED_IN') {
+          setLoading(true);
+          await fetchProfile(session.user.id);
+          setLoading(false);
+        } else {
+          fetchProfile(session.user.id);
+        }
       } else {
         setProfile(null);
+        setLoading(false);
       }
     });
 
     return () => {
+      mounted = false;
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
 
   // 실시간 알림 설정 (피평가자가 새로운 요구안을 제출했을 때)
   React.useEffect(() => {
-    if (!session) return;
+    if (!session || !userRole) return;
 
     const channel = supabase
       .channel('schema-db-changes')
