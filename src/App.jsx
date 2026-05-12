@@ -9,11 +9,13 @@ function App() {
   const [userRole, setUserRole] = useState('evaluator'); // 'evaluatee' or 'evaluator'
   const [currentTab, setCurrentTab] = useState('dashboard');
 
-  // Handle custom actions from sidebar
-  if (currentTab === 'switch-role') {
-    setUserRole(userRole === 'evaluator' ? 'evaluatee' : 'evaluator');
-    setCurrentTab('dashboard');
-  }
+  // Handle custom actions from sidebar in useEffect to avoid infinite re-renders
+  React.useEffect(() => {
+    if (currentTab === 'switch-role') {
+      setUserRole(prev => prev === 'evaluator' ? 'evaluatee' : 'evaluator');
+      setCurrentTab('dashboard');
+    }
+  }, [currentTab]);
 
   const renderContent = () => {
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
