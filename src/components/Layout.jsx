@@ -33,8 +33,6 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'negotiation', label: userRole === 'evaluator' ? '협상 관리' : '연봉 협상', icon: MessageSquare },
-    { id: 'documents', label: '평가 자료', icon: FileText },
-    { id: 'settings', label: '설정', icon: Settings },
   ];
 
   return (
@@ -101,7 +99,7 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                     {profile?.full_name || session?.user?.email?.split('@')[0]}
                   </p>
                   <p className="text-[10px] text-[var(--text-muted)] font-medium">
-                    {profile?.department} {profile?.employee_id ? `(${profile.employee_id})` : ''}
+                    {profile?.department} {profile?.position} {profile?.employee_id ? `(${profile.employee_id})` : ''}
                   </p>
                 </div>
                 <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden shadow-inner">

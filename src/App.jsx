@@ -43,8 +43,29 @@ function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    // 실시간 알림 설정 (피평가자가 새로운 요구안을 제출했을 때)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'negotiations',
+        },
+        (payload) => {
+          if (userRole === 'evaluator') {
+            alert(`새로운 협상 요구안이 접수되었습니다: ${payload.new.evaluatee_name}님`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+      supabase.removeChannel(channel);
+    };
+  }, [userRole]);
 
   // Handle custom actions from sidebar
   React.useEffect(() => {

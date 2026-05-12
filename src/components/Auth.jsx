@@ -60,6 +60,7 @@ const Auth = () => {
                 id: authData.user.id, 
                 full_name: fullName, 
                 department: department, 
+                position: employee.position, // 추가
                 employee_id: employeeId,
                 role: assignedRole
               }

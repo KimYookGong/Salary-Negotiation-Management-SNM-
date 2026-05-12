@@ -67,6 +67,7 @@ const EvaluateeDashboard = ({ profile }) => {
       evaluatee_id: profile.id,
       evaluatee_name: profile.full_name,
       department: profile.department,
+      position: profile.position, // 추가
       jd: formData.jd,
       evaluatee_proposal: formData.proposal,
       reason: formData.reason,

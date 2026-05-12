@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS negotiations (
   evaluatee_id UUID REFERENCES auth.users(id),
   evaluatee_name TEXT NOT NULL,
   department TEXT NOT NULL,
+  position TEXT, -- 직급 추가
   status TEXT NOT NULL DEFAULT 'submitted',
   evaluatee_proposal TEXT,
   evaluator_proposal TEXT,
@@ -20,6 +21,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
   department TEXT,
+  position TEXT, -- 직급 추가
   employee_id TEXT,
   role TEXT DEFAULT 'evaluatee',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS employees (
   employee_id TEXT PRIMARY KEY,
   full_name TEXT NOT NULL,
   department TEXT NOT NULL,
+  position TEXT NOT NULL, -- 직급 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -44,10 +47,3 @@ CREATE POLICY "Users can insert their own profiles" ON profiles FOR INSERT WITH 
 
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Employees are viewable by everyone" ON employees FOR SELECT USING (true);
-
--- 4. 사전 등록 사원 데이터 (테스트용)
-INSERT INTO employees (employee_id, full_name, department) VALUES 
-('HR202601', '관리자', '인사팀'),
-('DEV202601', '홍길동', '개발팀'),
-('DEV202602', '김철수', '개발팀'),
-('DS202601', '이영희', '디자인팀');
