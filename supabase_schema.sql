@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS negotiations (
   evaluatee_name TEXT NOT NULL,
   department department_type NOT NULL,
   position position_type,
+  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
   status TEXT NOT NULL DEFAULT 'submitted',
   evaluatee_proposal TEXT,
   evaluator_proposal TEXT,
@@ -35,6 +36,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name TEXT,
   department department_type,
   position position_type,
+  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
   employee_id TEXT,
   role TEXT DEFAULT 'evaluatee',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -46,6 +48,7 @@ CREATE TABLE IF NOT EXISTS employees (
   full_name TEXT NOT NULL,
   department department_type NOT NULL,
   position position_type NOT NULL,
+  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

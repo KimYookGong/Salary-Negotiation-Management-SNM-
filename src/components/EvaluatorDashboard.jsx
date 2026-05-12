@@ -16,7 +16,8 @@ import {
   Clock,
   AlertCircle,
   BarChart2,
-  RefreshCw
+  RefreshCw,
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -27,6 +28,17 @@ const statusMap = {
   counter_offer: { label: '역제시중', className: 'bg-purple-100 text-purple-700' },
   final_agreement: { label: '수락됨', className: 'bg-green-100 text-green-700' },
   rejected: { label: '거절됨', className: 'bg-red-100 text-red-700' },
+};
+
+// 직급별 가중치 (X축 좌표용)
+const positionWeight = {
+  '사원': 1,
+  '주임': 2,
+  '대리': 3,
+  '과장': 4,
+  '차장': 5,
+  '부장': 6,
+  '본부장': 7
 };
 
 const CounterOfferPopup = ({ isOpen, onClose, onConfirm, name, currentProposal }) => {
@@ -80,6 +92,7 @@ const CounterOfferPopup = ({ isOpen, onClose, onConfirm, name, currentProposal }
 
 const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [negotiations, setNegotiations] = useState([]);
+  const [allProfiles, setAllProfiles] = useState([]);
   const [selectedNegotiation, setSelectedNegotiation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,6 +105,13 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('전체');
 
   const departments = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
+  const deptColors = {
+    '운영팀': '#6366f1',
+    '인사팀': '#ec4899',
+    '마케팅팀': '#f59e0b',
+    '개발팀': '#10b981',
+    '디자인팀': '#8b5cf6'
+  };
 
   // 탭 변경 시 상세 보기 초기화
   useEffect(() => {
@@ -105,15 +125,19 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     const { data: negs } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
     if (negs) setNegotiations(negs);
 
-    // 2. 예산 데이터 (최신 연도 하나만)
+    // 2. 전체 임직원 프로필 (산점도용)
+    const { data: profs } = await supabase.from('profiles').select('*').eq('role', 'evaluatee');
+    if (profs) setAllProfiles(profs);
+
+    // 3. 예산 데이터 (최신 연도 하나만)
     const { data: bud } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
     if (bud) setBudget(bud);
 
-    // 3. 리스크 데이터 (High 레벨만)
+    // 4. 리스크 데이터 (High 레벨만)
     const { data: rsk } = await supabase.from('risk_assessments').select('*').eq('risk_level', 'High');
     if (rsk) setRisks(rsk);
 
-    // 4. 벤치마크 데이터
+    // 5. 벤치마크 데이터
     const { data: bmk } = await supabase.from('market_benchmarks').select('*');
     if (bmk) setBenchmarks(bmk);
 
@@ -123,7 +147,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   useEffect(() => {
     fetchData();
     
-    // 실시간 구독 (협상 상태 변화 감지)
     const channel = supabase
       .channel('dashboard-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'negotiations' }, () => {
@@ -270,7 +293,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
         <>
-          {/* 상단: 요약 카드 (슬림형) */}
+          {/* 상단: 요약 카드 */}
           <div className="grid grid-cols-4 gap-4 shrink-0">
             {stats.map((stat, i) => (
               <div key={i} className="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-4 border border-gray-100">
@@ -285,157 +308,187 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             ))}
           </div>
 
-          {/* 메인 섹션: 3열 레이아웃 */}
-          <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
-            {/* 좌측: 예산 및 벤치마크 (4칸) */}
-            <div className="col-span-4 flex flex-col gap-6 min-h-0">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col">
-                <h3 className="text-sm font-black flex items-center gap-2 mb-4">
-                  <TrendingUp size={18} className="text-[var(--color-primary)]" />
-                  예산 통제 현황
-                </h3>
-                <div className="flex-1 flex flex-col items-center justify-center relative">
-                  <div className="relative w-32 h-32 rounded-full border-[10px] border-gray-50 flex items-center justify-center">
-                    <svg className="absolute inset-[-10px] w-[calc(100%+20px)] h-[calc(100%+20px)] -rotate-90">
-                      <circle 
-                        cx="76" cy="76" r="66" fill="transparent" stroke="var(--color-primary)" strokeWidth="10"
-                        strokeDasharray={`${(budgetPercent * 414) / 100} 414`}
-                        className="transition-all duration-1000"
-                      />
-                    </svg>
-                    <div className="text-center">
-                      <p className="text-2xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
-                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
-                    </div>
+          {/* 중단: 예산 / 내부 형평성 산점도 / 부서 진행도 */}
+          <div className="grid grid-cols-12 gap-6 h-[45%] min-h-0 shrink-0">
+            {/* 1. 예산 (3/12) */}
+            <div className="col-span-3 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
+              <h3 className="text-sm font-black flex items-center gap-2 mb-4">
+                <TrendingUp size={18} className="text-[var(--color-primary)]" />
+                예산 통제 현황
+              </h3>
+              <div className="flex-1 flex flex-col items-center justify-center relative">
+                <div className="relative w-28 h-28 rounded-full border-[10px] border-gray-50 flex items-center justify-center">
+                  <svg className="absolute inset-[-10px] w-[calc(100%+20px)] h-[calc(100%+20px)] -rotate-90">
+                    <circle 
+                      cx="74" cy="74" r="64" fill="transparent" stroke="var(--color-primary)" strokeWidth="10"
+                      strokeDasharray={`${(budgetPercent * 402) / 100} 402`}
+                      className="transition-all duration-1000"
+                    />
+                  </svg>
+                  <div className="text-center">
+                    <p className="text-xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
                   </div>
-                  <div className="w-full mt-6 grid grid-cols-2 gap-4 text-center">
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">총 예산</p>
-                      <p className="text-sm font-black">{(budget.total_budget / 100000000).toFixed(1)}억</p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">사용액</p>
-                      <p className="text-sm font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-black flex items-center gap-2">
-                    <BarChart2 size={18} className="text-[var(--color-primary)]" />
-                    시장가 비교 분석
-                  </h3>
-                  <select 
-                    className="text-[10px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
-                    value={selectedDeptFilter}
-                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                  >
-                    <option value="전체">전체</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
-                  {benchmarks
-                    .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
-                    .map((b) => {
-                      const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
-                      return (
-                        <div key={b.id} className="flex-1 flex items-end gap-1 group relative h-full max-w-[40px]">
-                          <div className="flex-1 bg-gray-100 rounded-t-sm" style={{ height: `${(b.market_avg / max) * 100}%` }}></div>
-                          <div className="flex-1 bg-[var(--color-primary)] rounded-t-sm" style={{ height: `${(b.company_avg / max) * 100}%` }}></div>
-                          <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-gray-400">
-                            {b.department.replace('팀', '')}
-                          </div>
-                        </div>
-                      );
-                    })}
                 </div>
               </div>
             </div>
 
-            {/* 중앙: 부서별 진행도 (4칸) */}
-            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
-              <h3 className="text-sm font-black flex items-center gap-2 mb-6">
+            {/* 2. 내부 형평성 산점도 (6/12) */}
+            <div className="col-span-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0 relative">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-black flex items-center gap-2">
+                  <Target size={18} className="text-[var(--color-primary)]" />
+                  내부 형평성 산점도 (Pay Parity)
+                </h3>
+                <div className="flex gap-3">
+                  {Object.entries(deptColors).map(([dept, color]) => (
+                    <div key={dept} className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }}></div>
+                      <span className="text-[8px] font-bold text-gray-400">{dept.replace('팀', '')}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex-1 relative border-l border-b border-gray-100 mt-2 mb-6 ml-8">
+                {/* Y축 라벨 */}
+                <div className="absolute -left-10 top-0 h-full flex flex-col justify-between text-[8px] font-bold text-gray-400 py-1">
+                  <span>1.0억</span>
+                  <span>0.5억</span>
+                  <span>0원</span>
+                </div>
+                {/* X축 라벨 */}
+                <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[8px] font-bold text-gray-400 px-2">
+                  {Object.keys(positionWeight).map(p => <span key={p}>{p}</span>)}
+                </div>
+
+                {/* 그리드 라인 */}
+                <div className="absolute inset-0 flex flex-col justify-between opacity-5 pointer-events-none">
+                  {[1, 2, 3, 4].map(i => <div key={i} className="w-full border-t border-black"></div>)}
+                </div>
+
+                {/* 점들 */}
+                {allProfiles.map((p, i) => {
+                  const x = ((positionWeight[p.position] - 1) / 6) * 100;
+                  const salary = p.current_salary || 0;
+                  const y = Math.min((salary / 100000000) * 100, 100);
+                  return (
+                    <motion.div 
+                      key={p.id}
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: i * 0.05 }}
+                      className="absolute w-3 h-3 rounded-full border-2 border-white shadow-sm cursor-pointer hover:scale-150 transition-transform z-10"
+                      style={{ 
+                        left: `${x}%`, 
+                        bottom: `${y}%`, 
+                        backgroundColor: deptColors[p.department] || '#ccc',
+                        transform: 'translate(-50%, 50%)'
+                      }}
+                      title={`${p.full_name} (${p.position}): ${salary.toLocaleString()}원`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. 부서별 협상 진행도 (3/12) - 축소형 */}
+            <div className="col-span-3 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
+              <h3 className="text-sm font-black flex items-center gap-2 mb-4">
                 <RefreshCw size={18} className="text-[var(--color-secondary)]" />
-                부서별 협상 진행도
+                협상 진행도
               </h3>
-              <div className="flex-1 space-y-5 overflow-y-auto pr-2">
+              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
                 {departments.map(dept => {
                   const deptNegs = negotiations.filter(n => n.department === dept);
                   const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
                   const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
                   return (
-                    <div key={dept} className="space-y-1.5">
-                      <div className="flex justify-between items-center text-[11px] font-bold">
-                        <span className="text-gray-700">{dept}</span>
-                        <span className="text-gray-400">{completed}/{deptNegs.length} 완료</span>
+                    <div key={dept} className="space-y-1">
+                      <div className="flex justify-between items-center text-[9px] font-bold">
+                        <span className="text-gray-500">{dept}</span>
+                        <span className="text-gray-400">{Math.round(percent)}%</span>
                       </div>
-                      <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
-                        <motion.div 
-                          initial={{ width: 0 }} 
-                          animate={{ width: `${percent}%` }} 
-                          className="h-full bg-[var(--color-primary)] rounded-full"
-                        />
+                      <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-[var(--color-primary)]" style={{ width: `${percent}%` }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
+          </div>
 
-            {/* 우측: 인재 리스크 및 실시간 알림 (4칸) */}
-            <div className="col-span-4 flex flex-col gap-6 min-h-0">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
-                <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-red-500">
-                  <AlertCircle size={18} />
-                  고위험 인재 리스크
+          {/* 하단: 벤치마크 / 리스크 / 알림 */}
+          <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
+            {/* 4. 시장 벤치마크 (4/12) */}
+            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-black flex items-center gap-2">
+                  <BarChart2 size={18} className="text-[var(--color-primary)]" />
+                  시장가 비교
                 </h3>
-                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                  {risks.length > 0 ? risks.map((risk) => (
-                    <div key={risk.id} className="p-3 rounded-xl bg-red-50/50 border border-red-50 flex gap-3">
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center mb-1">
-                          <p className="font-black text-[11px] text-gray-900">{risk.employee_name} <span className="text-[9px] text-gray-400">({risk.department})</span></p>
-                          <span className="text-[8px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black">HIGH</span>
-                        </div>
-                        <p className="text-[10px] text-red-700/80 font-medium leading-tight">{risk.reason}</p>
-                      </div>
-                    </div>
-                  )) : (
-                    <div className="flex-1 flex items-center justify-center text-[11px] text-gray-300 font-bold">대상자 없음</div>
-                  )}
-                </div>
+                <select 
+                  className="text-[9px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
+                  value={selectedDeptFilter}
+                  onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                >
+                  <option value="전체">전체</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
               </div>
+              <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
+                {benchmarks
+                  .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
+                  .map((b) => {
+                    const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
+                    return (
+                      <div key={b.id} className="flex-1 flex items-end gap-1 group relative h-full max-w-[30px]">
+                        <div className="flex-1 bg-gray-100 rounded-t-sm" style={{ height: `${(b.market_avg / max) * 100}%` }}></div>
+                        <div className="flex-1 bg-[var(--color-primary)] rounded-t-sm" style={{ height: `${(b.company_avg / max) * 100}%` }}></div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
 
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
-                <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-[var(--color-accent-2)]">
-                  <Bell size={18} />
-                  실시간 협상 알림
-                </h3>
-                <div className="flex-1 overflow-y-auto space-y-1 pr-2">
-                  {negotiations.slice(0, 5).map((neg, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => setSelectedNegotiation(neg)}
-                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group"
-                    >
-                      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-all">
-                        {neg.status === 'submitted' ? <AlertCircle size={14} className="text-orange-500" /> : <Clock size={14} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold text-gray-900 truncate">
-                          <span className="text-[var(--color-primary)]">{neg.evaluatee_name}</span>님이 제안을 제출함
-                        </p>
-                        <p className="text-[8px] text-gray-400 font-medium">
-                          {new Date(neg.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className="text-gray-200 group-hover:text-[var(--color-primary)] transition-all" />
+            {/* 5. 고위험 리스크 (4/12) */}
+            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
+              <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-red-500">
+                <AlertCircle size={18} />
+                고위험 리스크
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                {risks.map((risk) => (
+                  <div key={risk.id} className="p-2.5 rounded-xl bg-red-50/50 border border-red-50 flex flex-col">
+                    <p className="font-black text-[10px] text-gray-900 mb-0.5">{risk.employee_name} <span className="text-[8px] text-gray-400">({risk.department})</span></p>
+                    <p className="text-[9px] text-red-700/80 font-medium truncate">{risk.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 6. 실시간 알림 (4/12) */}
+            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
+              <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-[var(--color-accent-2)]">
+                <Bell size={18} />
+                협상 알림
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+                {negotiations.slice(0, 4).map((neg, i) => (
+                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group">
+                    <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">
+                      <Clock size={12} />
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] font-bold text-gray-900 truncate">
+                        <span className="text-[var(--color-primary)]">{neg.evaluatee_name}</span>님의 새로운 활동
+                      </p>
+                      <p className="text-[8px] text-gray-400 font-medium">
+                        {new Date(neg.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
