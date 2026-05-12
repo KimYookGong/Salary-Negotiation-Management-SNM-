@@ -8,6 +8,9 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [department, setDepartment] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const handleAuth = async (e) => {
@@ -17,12 +20,34 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
+        const { data, error: authError } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              full_name: fullName,
+              department: department,
+              employee_id: employeeId
+            }
+          }
         });
-        if (error) throw error;
-        setMessage({ type: 'success', text: '회원가입 확인 메일을 보냈습니다. 이메일을 확인해 주세요!' });
+        if (authError) throw authError;
+
+        if (data.user) {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([
+              { 
+                id: data.user.id, 
+                full_name: fullName, 
+                department: department, 
+                employee_id: employeeId 
+              }
+            ]);
+          if (profileError) console.error('Profile creation error:', profileError);
+        }
+
+        setMessage({ type: 'success', text: '회원가입 확인 메일을 보냈습니다. (인증이 비활성화된 경우 바로 로그인 가능)' });
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -91,6 +116,55 @@ const Auth = () => {
                 />
               </div>
             </div>
+
+            <AnimatePresence>
+              {isSignUp && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-4 overflow-hidden"
+                >
+                  <div className="pt-2 border-t border-gray-100 mt-4">
+                    <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">이름</label>
+                    <input 
+                      type="text"
+                      required={isSignUp}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
+                      placeholder="홍길동"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">부서</label>
+                    <select 
+                      required={isSignUp}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                    >
+                      <option value="">부서 선택</option>
+                      <option value="개발팀">개발팀</option>
+                      <option value="디자인팀">디자인팀</option>
+                      <option value="마케팅팀">마케팅팀</option>
+                      <option value="인사팀">인사팀</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">사번</label>
+                    <input 
+                      type="text"
+                      required={isSignUp}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
+                      placeholder="20240101"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <AnimatePresence>
               {message.text && (
