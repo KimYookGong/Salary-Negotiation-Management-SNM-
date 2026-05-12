@@ -19,7 +19,8 @@ import {
   RefreshCw,
   Target,
   Zap,
-  Loader2
+  Loader2,
+  Sparkles
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -100,6 +101,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isUpdatingMarket, setIsUpdatingMarket] = useState(false);
 
   // 심층 데이터 상태
   const [budget, setBudget] = useState({ total_budget: 1, used_budget: 0 });
@@ -257,6 +259,46 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       alert('AI 분석 중 오류가 발생했습니다.');
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleMarketUpdate = async () => {
+    setIsUpdatingMarket(true);
+    try {
+      const targetDepts = selectedDeptFilter === '전체' ? departments : [selectedDeptFilter];
+      
+      for (const dept of targetDepts) {
+        const prompt = `너는 한국 HR 보상 전문가야. 2026년 한국 IT/스타트업 산업 기준, '${dept}'의 3~5년 차 평균 연봉을 추정해 줘. 결과는 반드시 다른 설명 없이 오직 JSON 형식 {"market_avg": 숫자만} 으로 반환해. 숫자 값은 연봉(원 단위, 예: 65000000)으로 작성해줘.`;
+
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+          })
+        });
+
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonStr = rawText.replace(/```json|```/g, '').trim();
+        const result = JSON.parse(jsonStr);
+
+        if (result.market_avg) {
+          const { error } = await supabase
+            .from('market_benchmarks')
+            .update({ market_avg: result.market_avg, updated_at: new Date() })
+            .eq('department', dept);
+          
+          if (error) console.error(`${dept} 업데이트 오류:`, error);
+        }
+      }
+      alert('시장가가 최신 정보로 업데이트되었습니다.');
+      fetchData();
+    } catch (error) {
+      console.error('시장가 업데이트 오류:', error);
+      alert('시장가 업데이트 중 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingMarket(false);
     }
   };
 
@@ -553,14 +595,28 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   <BarChart2 size={18} className="text-[var(--color-primary)]" />
                   시장가 비교
                 </h3>
-                <select 
-                  className="text-[9px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
-                  value={selectedDeptFilter}
-                  onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                >
-                  <option value="전체">전체</option>
-                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleMarketUpdate}
+                    disabled={isUpdatingMarket}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--color-primary)]/5 text-[var(--color-primary)] text-[10px] font-black hover:bg-[var(--color-primary)]/10 transition-all disabled:opacity-50"
+                  >
+                    {isUpdatingMarket ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    AI 업데이트
+                  </button>
+                  <select 
+                    className="text-[9px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
+                    value={selectedDeptFilter}
+                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                  >
+                    <option value="전체">전체</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
                 {benchmarks
