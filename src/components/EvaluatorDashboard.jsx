@@ -83,7 +83,15 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
-  // 탭 변경 시 상세 보기 초기화 (직접 대시보드 이동 지원)
+  // 사원 관리 상태
+  const [employees, setEmployees] = useState([]);
+  const [newEmployee, setNewEmployee] = useState({ id: '', name: '', dept: '', pos: '' });
+  const [empLoading, setEmpLoading] = useState(false);
+
+  const departments = ['개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀'];
+  const positions = ['사원', '주임', '대리', '과장', '차장', '부장', '본부장'];
+
+  // 탭 변경 시 상세 보기 초기화
   useEffect(() => {
     setSelectedNegotiation(null);
   }, [currentTab]);
@@ -100,9 +108,42 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     setLoading(false);
   };
 
+  const fetchEmployees = async () => {
+    const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
+    if (!error) setEmployees(data);
+  };
+
   useEffect(() => {
     fetchNegotiations();
+    fetchEmployees();
   }, []);
+
+  const handleAddEmployee = async (e) => {
+    e.preventDefault();
+    setEmpLoading(true);
+    const { error } = await supabase
+      .from('employees')
+      .insert([{ 
+        employee_id: newEmployee.id, 
+        full_name: newEmployee.name, 
+        department: newEmployee.dept, 
+        position: newEmployee.pos 
+      }]);
+    
+    if (error) alert('등록 실패: ' + error.message);
+    else {
+      alert('등록되었습니다.');
+      setNewEmployee({ id: '', name: '', dept: '', pos: '' });
+      fetchEmployees();
+    }
+    setEmpLoading(false);
+  };
+
+  const handleDeleteEmployee = async (id) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('employees').delete().eq('employee_id', id);
+    if (!error) fetchEmployees();
+  };
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase
@@ -259,7 +300,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   부서별 협상 진행도
                 </h3>
                 <div className="space-y-6">
-                  {['개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀'].map(dept => {
+                  {departments.map(dept => {
                     const deptNegs = negotiations.filter(n => n.department === dept);
                     const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
                     const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
@@ -291,7 +332,11 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 </div>
                 <div className="p-4 space-y-2 overflow-y-auto max-h-[600px]">
                   {negotiations.slice(0, 8).map((neg, i) => (
-                    <div key={i} className="flex items-center gap-4 p-5 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group">
+                    <div 
+                      key={i} 
+                      onClick={() => setSelectedNegotiation(neg)}
+                      className="flex items-center gap-4 p-5 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group"
+                    >
                       <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-all">
                         {neg.status === 'submitted' ? <AlertCircle size={20} className="text-orange-500" /> : <Clock size={20} />}
                       </div>
@@ -381,6 +426,114 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </table>
           </div>
         </motion.div>
+      )}
+
+      {currentTab === 'employees' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-1">
+            <div className="card shadow-xl sticky top-24">
+              <h3 className="text-xl font-black mb-6 flex items-center gap-2">
+                <UserPlus size={24} className="text-[var(--color-primary)]" />
+                신규 사원 등록
+              </h3>
+              <form onSubmit={handleAddEmployee} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">사번</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    placeholder="예: 20240101"
+                    value={newEmployee.id}
+                    onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">이름</label>
+                  <input 
+                    type="text" 
+                    required 
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    placeholder="성함 입력"
+                    value={newEmployee.name}
+                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">부서</label>
+                  <select 
+                    required 
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    value={newEmployee.dept}
+                    onChange={(e) => setNewEmployee({...newEmployee, dept: e.target.value})}
+                  >
+                    <option value="">부서 선택</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-1.5">직급</label>
+                  <select 
+                    required 
+                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    value={newEmployee.pos}
+                    onChange={(e) => setNewEmployee({...newEmployee, pos: e.target.value})}
+                  >
+                    <option value="">직급 선택</option>
+                    {positions.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={empLoading}
+                  className="btn btn-primary w-full justify-center py-4 mt-2"
+                >
+                  {empLoading ? '처리 중...' : '사원 등록하기'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2">
+            <div className="card shadow-xl p-0 overflow-hidden">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
+                <h3 className="text-xl font-black">사원 마스터 데이터</h3>
+                <span className="text-sm font-bold text-[var(--text-muted)]">전체 {employees.length}명</span>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">사번</th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">이름</th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">부서</th>
+                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">직급</th>
+                      <th className="px-6 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-wider">관리</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {employees.map((emp) => (
+                      <tr key={emp.employee_id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.employee_id}</td>
+                        <td className="px-6 py-4 text-sm font-black text-gray-900">{emp.full_name}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.department}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.position}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button 
+                            onClick={() => handleDeleteEmployee(emp.employee_id)}
+                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          >
+                            <X size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

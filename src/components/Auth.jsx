@@ -167,9 +167,13 @@ const Auth = () => {
                     >
                       <option value="">부서 선택</option>
                       <option value="개발팀">개발팀</option>
-                      <option value="디자인팀">디자인팀</option>
-                      <option value="마케팅팀">마케팅팀</option>
                       <option value="인사팀">인사팀</option>
+                      <option value="마케팅팀">마케팅팀</option>
+                      <option value="디자인팀">디자인팀</option>
+                      <option value="영업팀">영업팀</option>
+                      <option value="경영지원팀">경영지원팀</option>
+                      <option value="기술지원팀">기술지원팀</option>
+                      <option value="데이터팀">데이터팀</option>
                     </select>
                   </div>
                   <div>

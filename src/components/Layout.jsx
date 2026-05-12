@@ -31,11 +31,28 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
 const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profile }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState([
+    { id: 1, text: "권지민 주임님이 거절됨 상태입니다.", time: "2026. 5. 12. 오후 2:54:54" },
+    { id: 2, text: "새로운 협상 요청이 도착했습니다.", time: "2026. 5. 12. 오후 3:07:07" },
+    { id: 3, text: "이준영 대리님의 협상이 완료되었습니다.", time: "2026. 5. 12. 오후 3:15:20" },
+  ]);
 
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'negotiation', label: userRole === 'evaluator' ? '협상 관리' : '연봉 협상', icon: MessageSquare },
   ];
+
+  if (userRole === 'evaluator') {
+    menuItems.push({ id: 'employees', label: '사원 관리', icon: User });
+  }
+
+  const markAsRead = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const markAllAsRead = () => {
+    setNotifications([]);
+  };
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FA]">
@@ -96,7 +113,9 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                   className="relative text-[var(--text-muted)] hover:text-[var(--color-primary)] p-2 transition-colors"
                 >
                   <Bell size={20} />
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
+                  )}
                 </button>
 
                 <AnimatePresence>
@@ -114,25 +133,44 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                       >
                         <div className="p-4 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                           <h4 className="font-black text-sm text-[var(--color-primary)]">최근 알림</h4>
-                          <span className="text-[10px] bg-[var(--color-primary)] text-white px-2 py-0.5 rounded-full font-bold">New</span>
+                          {notifications.length > 0 && (
+                            <span className="text-[10px] bg-[var(--color-primary)] text-white px-2 py-0.5 rounded-full font-bold">
+                              {notifications.length} New
+                            </span>
+                          )}
                         </div>
                         <div className="max-h-[400px] overflow-y-auto">
-                          {[1, 2, 3].map((_, i) => (
-                            <div key={i} className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors last:border-0">
-                              <p className="text-xs font-bold text-[var(--text-main)] mb-1">
-                                {i === 0 ? "권지민 주임님이 거절됨 상태입니다." : i === 1 ? "새로운 협상 요청이 도착했습니다." : "이준영 대리님의 협상이 완료되었습니다."}
-                              </p>
-                              <p className="text-[10px] text-[var(--text-muted)] uppercase font-medium">
-                                2026. 5. 12. 오후 2:54:54
-                              </p>
+                          {notifications.length > 0 ? (
+                            notifications.map((n) => (
+                              <div 
+                                key={n.id} 
+                                onClick={() => markAsRead(n.id)}
+                                className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors last:border-0"
+                              >
+                                <p className="text-xs font-bold text-[var(--text-main)] mb-1">
+                                  {n.text}
+                                </p>
+                                <p className="text-[10px] text-[var(--text-muted)] uppercase font-medium">
+                                  {n.time}
+                                </p>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="p-8 text-center text-xs text-gray-400 font-medium">
+                              알림이 없습니다.
                             </div>
-                          ))}
+                          )}
                         </div>
-                        <div className="p-3 bg-gray-50/50 text-center">
-                          <button className="text-[10px] font-black text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors">
-                            모든 알림 보기
-                          </button>
-                        </div>
+                        {notifications.length > 0 && (
+                          <div className="p-3 bg-gray-50/50 text-center border-t border-gray-50">
+                            <button 
+                              onClick={markAllAsRead}
+                              className="text-[10px] font-black text-[var(--text-muted)] hover:text-[var(--color-primary)] transition-colors"
+                            >
+                              모두 읽음 처리
+                            </button>
+                          </div>
+                        )}
                       </motion.div>
                     </>
                   )}
