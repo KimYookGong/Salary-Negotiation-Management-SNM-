@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { supabase } from '../supabaseClient';
+
 const AIInsightSection = ({ evaluationData }) => {
   return (
     <div className="card ai-insight relative overflow-hidden">
@@ -99,12 +101,44 @@ const DecisionPopup = ({ isOpen, onClose, onConfirm, currentProposal }) => {
 const EvaluatorDashboard = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [negotiations, setNegotiations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const users = [
-    { id: 1, name: '홍길동', dept: '개발팀', status: 'submitted', proposal: '₩75,000,000', score: 4.8 },
-    { id: 2, name: '이영희', dept: '디자인팀', status: 'under_review', proposal: '₩68,000,000', score: 4.5 },
-    { id: 3, name: '김철수', dept: '마케팅팀', status: 'counter_offer', proposal: '₩62,000,000', score: 4.2 },
-  ];
+  const fetchNegotiations = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('negotiations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching negotiations:', error);
+    } else {
+      setNegotiations(data);
+      if (selectedUser) {
+        const updatedSelected = data.find(n => n.id === selectedUser.id);
+        setSelectedUser(updatedSelected || null);
+      }
+    }
+    setLoading(false);
+  };
+
+  React.useEffect(() => {
+    fetchNegotiations();
+  }, []);
+
+  const handleStatusUpdate = async (id, status, extraFields = {}) => {
+    const { error } = await supabase
+      .from('negotiations')
+      .update({ status, updated_at: new Date(), ...extraFields })
+      .eq('id', id);
+
+    if (error) {
+      alert('상태 업데이트 중 오류가 발생했습니다.');
+    } else {
+      fetchNegotiations();
+    }
+  };
 
   return (
     <div className="space-y-8 w-full max-w-[1600px] mx-auto">
@@ -141,7 +175,9 @@ const EvaluatorDashboard = () => {
               </div>
             </div>
             <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-              {users.map((user) => (
+              {loading ? (
+                <div className="p-8 text-center text-[var(--text-muted)]">불러오는 중...</div>
+              ) : negotiations.map((user) => (
                 <div 
                   key={user.id}
                   onClick={() => setSelectedUser(user)}
@@ -150,16 +186,16 @@ const EvaluatorDashboard = () => {
                   }`}
                 >
                   <div className="flex justify-between items-start mb-2">
-                    <p className="font-bold text-base">{user.name}</p>
+                    <p className="font-bold text-base">{user.evaluatee_name}</p>
                     <p className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
                       selectedUser?.id === user.id ? 'bg-white/20 text-white' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]'
                     }`}>
-                      {user.dept}
+                      {user.department}
                     </p>
                   </div>
                   <div className="flex justify-between items-center">
                     <p className={`text-xs font-medium ${selectedUser?.id === user.id ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
-                      희망: {user.proposal}
+                      희망: {user.evaluatee_proposal}
                     </p>
                     <div className="flex items-center gap-1">
                       <span className="text-[10px] font-bold text-yellow-400">★</span>
@@ -198,9 +234,9 @@ const EvaluatorDashboard = () => {
                   <div className="card">
                     <h4 className="text-sm font-bold text-[var(--color-accent-2)] uppercase mb-4">요구 사항 및 근거</h4>
                     <div className="space-y-3">
-                      <p className="text-lg font-bold text-[var(--color-primary)]">{selectedUser.proposal}</p>
+                      <p className="text-lg font-bold text-[var(--color-primary)]">{selectedUser.evaluatee_proposal}</p>
                       <p className="text-sm text-gray-600 italic">
-                        "지난 1년간 프로젝트 기여도와 시장 평균 연봉 대비 성과를 고려하여 제안합니다."
+                        "{selectedUser.reason || '입력된 근거가 없습니다.'}"
                       </p>
                     </div>
                   </div>
@@ -208,7 +244,10 @@ const EvaluatorDashboard = () => {
 
                 {/* Decision Actions */}
                 <div className="flex gap-4 pt-4">
-                  <button className="btn btn-outline flex-1 justify-center text-red-600 hover:bg-red-50 hover:border-red-200">
+                  <button 
+                    onClick={() => handleStatusUpdate(selectedUser.id, 'rejected')}
+                    className="btn btn-outline flex-1 justify-center text-red-600 hover:bg-red-50 hover:border-red-200"
+                  >
                     <X size={18} /> 거절
                   </button>
                   <button 
@@ -217,7 +256,10 @@ const EvaluatorDashboard = () => {
                   >
                     <RefreshCw size={18} /> 역제시
                   </button>
-                  <button className="btn btn-primary flex-1 justify-center">
+                  <button 
+                    onClick={() => handleStatusUpdate(selectedUser.id, 'final_agreement')}
+                    className="btn btn-primary flex-1 justify-center"
+                  >
                     <Check size={18} /> 즉시 수락
                   </button>
                 </div>
@@ -235,9 +277,12 @@ const EvaluatorDashboard = () => {
       <DecisionPopup 
         isOpen={isPopupOpen}
         onClose={() => setIsPopupOpen(false)}
-        currentProposal={selectedUser?.proposal}
+        currentProposal={selectedUser?.evaluatee_proposal}
         onConfirm={(prop, reason) => {
-          console.log('Counter Offer:', prop, reason);
+          handleStatusUpdate(selectedUser.id, 'counter_offer', {
+            evaluator_proposal: prop,
+            evaluator_comment: reason
+          });
           setIsPopupOpen(false);
         }}
       />
