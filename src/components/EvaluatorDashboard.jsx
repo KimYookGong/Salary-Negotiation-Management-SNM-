@@ -331,8 +331,9 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           }
         }
       }
+      console.log('시장가 업데이트 완료. 새로고침 시작...');
+      await fetchData();
       alert('시장가가 최신 정보로 업데이트되었습니다.');
-      fetchData();
     } catch (error) {
       console.error('시장가 업데이트 오류:', error);
       alert('시장가 업데이트 중 오류가 발생했습니다.');
@@ -658,30 +659,40 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 </div>
               </div>
               <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
-                {benchmarks
-                  .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
-                  .map((b) => {
-                    const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
-                    return (
-                      <div key={b.id} className="flex-1 flex flex-col items-center gap-2 h-full min-w-0 group relative">
-                        <div className="flex-1 w-full flex items-end justify-center gap-1 min-h-0">
-                          <div 
-                            className="w-full max-w-[12px] bg-gray-100 rounded-t-sm transition-all duration-500 hover:bg-gray-200" 
-                            style={{ height: `${(b.market_avg / max) * 100}%` }}
-                            title={`시장 평균: ${(b.market_avg / 10000).toLocaleString()}만원`}
-                          ></div>
-                          <div 
-                            className="w-full max-w-[12px] bg-[var(--color-primary)] rounded-t-sm transition-all duration-500 hover:opacity-80" 
-                            style={{ height: `${(b.company_avg / max) * 100}%` }}
-                            title={`자사 평균: ${(b.company_avg / 10000).toLocaleString()}만원`}
-                          ></div>
+                {benchmarks.filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter).length === 0 ? (
+                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-300 opacity-60">
+                    <BarChart2 size={24} strokeWidth={1} />
+                    <p className="text-[8px] font-bold">데이터가 없습니다. AI 업데이트를 눌러주세요.</p>
+                  </div>
+                ) : (
+                  benchmarks
+                    .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
+                    .map((b) => {
+                      const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
+                      return (
+                        <div key={b.id} className="flex-1 flex flex-col items-center gap-2 h-full min-w-0 group relative">
+                          <div className="flex-1 w-full flex items-end justify-center gap-1.5 min-h-0">
+                            <motion.div 
+                              initial={{ height: 0 }}
+                              animate={{ height: `${(b.market_avg / max) * 100}%` }}
+                              className="w-full max-w-[14px] bg-gray-100 rounded-t-md transition-all duration-500 hover:bg-gray-200 cursor-help" 
+                              title={`시장 평균: ${(b.market_avg / 10000).toLocaleString()}만원`}
+                            ></motion.div>
+                            <motion.div 
+                              initial={{ height: 0 }}
+                              animate={{ height: `${(b.company_avg / max) * 100}%` }}
+                              className="w-full max-w-[14px] bg-[var(--color-primary)] rounded-t-md transition-all duration-500 hover:opacity-80 cursor-help shadow-sm" 
+                              style={{ borderBottom: '2px solid rgba(0,0,0,0.05)' }}
+                              title={`자사 평균: ${(b.company_avg / 10000).toLocaleString()}만원`}
+                            ></motion.div>
+                          </div>
+                          <span className="text-[7px] font-black text-gray-400 truncate w-full text-center uppercase tracking-tighter">
+                            {b.department.replace('팀', '')}
+                          </span>
                         </div>
-                        <span className="text-[7px] font-black text-gray-400 truncate w-full text-center">
-                          {b.department.replace('팀', '')}
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })
+                )}
               </div>
             </div>
 
