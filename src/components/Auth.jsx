@@ -109,7 +109,7 @@ const Auth = () => {
 
           <form onSubmit={handleAuth} className="space-y-4">
             <div>
-              <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">이메일</label>
+              <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">ID</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
                 <input 
@@ -124,14 +124,14 @@ const Auth = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">비밀번호</label>
+              <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
                 <input 
                   type="password"
                   required
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
-                  placeholder="••••••••"
+                  placeholder="••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -144,7 +144,7 @@ const Auth = () => {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="space-y-4 overflow-hidden"
+                  className="space-y-4"
                 >
                   <div className="pt-2 border-t border-gray-100 mt-4">
                     <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">이름</label>
@@ -152,7 +152,7 @@ const Auth = () => {
                       type="text"
                       required={isSignUp}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
-                      placeholder="홍길동"
+                      placeholder="성명"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                     />
@@ -166,11 +166,11 @@ const Auth = () => {
                       onChange={(e) => setDepartment(e.target.value)}
                     >
                       <option value="">부서 선택</option>
+                      <option value="개발팀">개발팀</option>
+                      <option value="디자인팀">디자인팀</option>
                       <option value="운영팀">운영팀</option>
                       <option value="인사팀">인사팀</option>
                       <option value="마케팅팀">마케팅팀</option>
-                      <option value="개발팀">개발팀</option>
-                      <option value="디자인팀">디자인팀</option>
                     </select>
                   </div>
                   <div>
@@ -179,7 +179,7 @@ const Auth = () => {
                       type="text"
                       required={isSignUp}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
-                      placeholder="20240101"
+                      placeholder="2024000001"
                       value={employeeId}
                       onChange={(e) => setEmployeeId(e.target.value)}
                     />
