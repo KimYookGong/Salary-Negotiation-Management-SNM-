@@ -70,17 +70,6 @@ CREATE TABLE IF NOT EXISTS budgets (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-
-
--- 7. 알림 테이블 (영속성용)
-CREATE TABLE IF NOT EXISTS notifications (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES auth.users(id),
-  content TEXT NOT NULL,
-  is_read BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
 -- RLS 설정 및 정책 초기화
 ALTER TABLE negotiations ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Allow all actions for now" ON negotiations;
