@@ -106,11 +106,7 @@ ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Budgets are viewable by everyone" ON budgets;
 CREATE POLICY "Allow all actions for now" ON budgets FOR ALL USING (true);
 
-ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Users can see their own notifications" ON notifications;
-CREATE POLICY "Users can see their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
-DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
-CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
 
 -- 6. 예산 업데이트용 RPC 함수
 CREATE OR REPLACE FUNCTION increment_budget(amount BIGINT, dept department_type)
