@@ -68,7 +68,15 @@ function App() {
       }
     });
 
-    // 실시간 알림 설정 (피평가자가 새로운 요구안을 제출했을 때)
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // 실시간 알림 설정 (피평가자가 새로운 요구안을 제출했을 때)
+  React.useEffect(() => {
+    if (!session) return;
+
     const channel = supabase
       .channel('schema-db-changes')
       .on(
@@ -87,10 +95,9 @@ function App() {
       .subscribe();
 
     return () => {
-      subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [userRole]);
+  }, [userRole, session]);
 
   // Handle custom actions from sidebar
   React.useEffect(() => {
