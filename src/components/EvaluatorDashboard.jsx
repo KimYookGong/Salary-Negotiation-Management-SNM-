@@ -317,27 +317,31 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 예산 통제 현황
               </h3>
               <div className="flex-1 flex flex-col items-center justify-center relative">
-                <div className="relative w-40 h-40 rounded-full border-[12px] border-gray-50 flex items-center justify-center">
-                  <svg className="absolute inset-[-12px] w-[calc(100%+24px)] h-[calc(100%+24px)] -rotate-90">
+                <div className="relative w-44 h-44 flex items-center justify-center">
+                  <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 100 100">
                     <circle 
-                      cx="92" cy="92" r="80" fill="transparent" stroke="var(--color-primary)" strokeWidth="12"
-                      strokeDasharray={`${(budgetPercent * 502) / 100} 502`}
+                      cx="50" cy="50" r="40" fill="transparent" stroke="#f9fafb" strokeWidth="10"
+                    />
+                    <circle 
+                      cx="50" cy="50" r="40" fill="transparent" stroke="var(--color-primary)" strokeWidth="10"
+                      strokeDasharray={`${(budgetPercent * 251.3) / 100} 251.3`}
+                      strokeLinecap="round"
                       className="transition-all duration-1000"
                     />
                   </svg>
-                  <div className="text-center">
-                    <p className="text-3xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
+                  <div className="text-center z-10">
+                    <p className="text-4xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
                   </div>
                 </div>
                 <div className="w-full mt-8 grid grid-cols-2 gap-6 text-center border-t border-gray-50 pt-6">
                   <div>
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">총 인상 예산</p>
-                    <p className="text-base font-black text-gray-900">{(budget.total_budget / 100000000).toFixed(1)}억</p>
+                    <p className="text-base font-black text-gray-900">{(budget.total_budget / 10000).toLocaleString()}만원</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">현재 사용액</p>
-                    <p className="text-base font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억</p>
+                    <p className="text-base font-black text-[var(--color-secondary)]">{(budget.used_budget / 10000).toLocaleString()}만원</p>
                   </div>
                 </div>
               </div>
@@ -414,9 +418,9 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
                   return (
                     <div key={dept} className="space-y-1">
-                      <div className="flex justify-between items-center text-[9px] font-bold">
-                        <span className="text-gray-500">{dept}</span>
-                        <span className="text-gray-400">{Math.round(percent)}%</span>
+                      <div className="flex justify-between items-center text-xs font-bold">
+                        <span className="text-gray-600">{dept}</span>
+                        <span className="text-[var(--color-primary)]">{Math.round(percent)}%</span>
                       </div>
                       <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
                         <div className="h-full bg-[var(--color-primary)]" style={{ width: `${percent}%` }} />
