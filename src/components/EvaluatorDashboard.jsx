@@ -9,6 +9,7 @@ import {
   FileText,
   AlertCircle,
   Users,
+  User,
   Filter,
   ArrowUpDown,
   LayoutDashboard
@@ -247,8 +248,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   <tr key={emp.employee_id} className="hover:bg-gray-50/50 transition-all group">
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)]/5 text-[var(--color-primary)] flex items-center justify-center font-black text-sm">
-                          {emp.full_name[0]}
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center">
+                          <User size={20} />
                         </div>
                         <p className="text-sm font-black text-gray-900">{emp.full_name}</p>
                       </div>
@@ -326,8 +327,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   <tr key={neg.id} className="hover:bg-gray-50/50 transition-all cursor-pointer group" onClick={() => setSelectedNegotiation(neg)}>
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-[var(--color-primary)] flex items-center justify-center font-black text-sm group-hover:bg-[var(--color-primary)] group-hover:text-white transition-all">
-                          {neg.evaluatee_name[0]}
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center group-hover:bg-[var(--color-primary)] group-hover:text-white transition-all">
+                          <User size={20} />
                         </div>
                         <div>
                           <p className="text-sm font-black text-gray-900">{neg.evaluatee_name}</p>
@@ -388,8 +389,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
               <div className="p-10">
                 <div className="flex justify-between items-start mb-10">
                   <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-primary/20">
-                      {selectedNegotiation.evaluatee_name[0]}
+                    <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 shadow-inner">
+                      <User size={32} />
                     </div>
                     <div>
                       <h2 className="text-3xl font-black text-[var(--text-main)]">{selectedNegotiation.evaluatee_name}</h2>

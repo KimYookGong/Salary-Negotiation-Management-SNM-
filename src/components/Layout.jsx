@@ -107,8 +107,8 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                     {profile?.department} {profile?.position}
                   </p>
                 </div>
-                <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden shadow-inner">
-                  {profile?.full_name ? profile.full_name[0] : <User size={20} />}
+                <div className="w-10 h-10 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center overflow-hidden shadow-inner border border-gray-100">
+                  <User size={20} />
                 </div>
               </div>
 
