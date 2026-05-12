@@ -317,17 +317,27 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 예산 통제 현황
               </h3>
               <div className="flex-1 flex flex-col items-center justify-center relative">
-                <div className="relative w-28 h-28 rounded-full border-[10px] border-gray-50 flex items-center justify-center">
-                  <svg className="absolute inset-[-10px] w-[calc(100%+20px)] h-[calc(100%+20px)] -rotate-90">
+                <div className="relative w-40 h-40 rounded-full border-[12px] border-gray-50 flex items-center justify-center">
+                  <svg className="absolute inset-[-12px] w-[calc(100%+24px)] h-[calc(100%+24px)] -rotate-90">
                     <circle 
-                      cx="74" cy="74" r="64" fill="transparent" stroke="var(--color-primary)" strokeWidth="10"
-                      strokeDasharray={`${(budgetPercent * 402) / 100} 402`}
+                      cx="92" cy="92" r="80" fill="transparent" stroke="var(--color-primary)" strokeWidth="12"
+                      strokeDasharray={`${(budgetPercent * 502) / 100} 502`}
                       className="transition-all duration-1000"
                     />
                   </svg>
                   <div className="text-center">
-                    <p className="text-xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
-                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
+                    <p className="text-3xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
+                  </div>
+                </div>
+                <div className="w-full mt-8 grid grid-cols-2 gap-6 text-center border-t border-gray-50 pt-6">
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">총 인상 예산</p>
+                    <p className="text-base font-black text-gray-900">{(budget.total_budget / 100000000).toFixed(1)}억</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">현재 사용액</p>
+                    <p className="text-base font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억</p>
                   </div>
                 </div>
               </div>
