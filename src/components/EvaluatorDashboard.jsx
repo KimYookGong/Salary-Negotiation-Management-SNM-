@@ -17,10 +17,7 @@ import {
   AlertCircle,
   BarChart2,
   RefreshCw,
-  Target,
-  Zap,
-  Loader2,
-  Sparkles
+  Target
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -100,14 +97,10 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isUpdatingMarket, setIsUpdatingMarket] = useState(false);
 
   // 심층 데이터 상태
   const [budget, setBudget] = useState({ total_budget: 1, used_budget: 0 });
-  const [risks, setRisks] = useState([]);
-  const [benchmarks, setBenchmarks] = useState([]);
-  const [selectedDeptFilter, setSelectedDeptFilter] = useState('전체');
+
 
   const departments = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
   const deptColors = {
@@ -138,13 +131,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     const { data: bud } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
     if (bud) setBudget(bud);
 
-    // 4. 리스크 데이터 (High 레벨만)
-    const { data: rsk } = await supabase.from('risk_assessments').select('*').eq('risk_level', 'High');
-    if (rsk) setRisks(rsk);
 
-    // 5. 벤치마크 데이터
-    const { data: bmk } = await supabase.from('market_benchmarks').select('*');
-    if (bmk) setBenchmarks(bmk);
 
     setLoading(false);
   };
@@ -164,183 +151,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     };
   }, []);
 
-  const handleAIAnalysis = async () => {
-    if (!selectedNegotiation) return;
-    setIsAnalyzing(true);
 
-    try {
-      const prompt = `
-        다음 직원에 대한 인사 데이터와 직무기술서(JD)를 바탕으로 심층 분석을 수행해줘.
-        
-        [직원 정보]
-        이름: ${selectedNegotiation.evaluatee_name}
-        부서: ${selectedNegotiation.department}
-        직급: ${selectedNegotiation.position}
-        요구안: ${selectedNegotiation.evaluatee_proposal}
-        
-        [직무기술서(JD)]
-        ${selectedNegotiation.jd || '정보 없음'}
-        
-        [성과 및 근거]
-        ${selectedNegotiation.reason || '정보 없음'}
-        
-        [지시 사항]
-        1. 이 직원의 적정 가치 점수(capability_score)를 0.0에서 5.0 사이의 실수로 산출해줘.
-        2. 이탈 위험도(risk_level)를 'High', 'Medium', 'Low' 중 하나로 평가해줘.
-        3. 평가 및 거절/수락 사유(reason)를 상세히 작성해줘.
-        
-        반드시 다음 JSON 형식으로만 응답해 (추가 설명 없이 JSON만):
-        {
-          "capability_score": 4.5,
-          "risk_level": "Medium",
-          "reason": "성과가 우수하나 시장가 대비 요구액이 높음..."
-        }
-      `;
-
-      // API 호출 (더 안정적인 1.5 Flash 모델 사용)
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'API 호출 실패');
-      }
-
-      const data = await response.json();
-      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      
-      // JSON 추출 개선 (정규식 사용)
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('응답에서 JSON을 찾을 수 없습니다.');
-      const result = JSON.parse(jsonMatch[0]);
-
-      // 1. negotiations 테이블 score 업데이트
-      const { error: scoreError } = await supabase
-        .from('negotiations')
-        .update({ score: result.capability_score })
-        .eq('id', selectedNegotiation.id);
-
-      if (scoreError) throw scoreError;
-
-      // 2. risk_assessments 테이블 Insert/Update (employee_id 기준)
-      const employeeProfile = allProfiles.find(p => p.id === selectedNegotiation.evaluatee_id);
-      const employee_id = employeeProfile?.employee_id || `EMP-${selectedNegotiation.evaluatee_id.slice(0, 8)}`;
-
-      // 기존 리스크가 있는지 확인 (employee_id 기준)
-      const { data: existingRisk } = await supabase
-        .from('risk_assessments')
-        .select('id')
-        .eq('employee_id', employee_id)
-        .single();
-
-      if (existingRisk) {
-        await supabase
-          .from('risk_assessments')
-          .update({
-            risk_level: result.risk_level,
-            reason: result.reason
-          })
-          .eq('id', existingRisk.id);
-      } else {
-        await supabase
-          .from('risk_assessments')
-          .insert({
-            employee_id,
-            employee_name: selectedNegotiation.evaluatee_name,
-            department: selectedNegotiation.department,
-            risk_level: result.risk_level,
-            reason: result.reason
-          });
-      }
-
-      alert('AI 분석이 완료되었습니다.');
-      fetchData(); // 대시보드 새로고침
-    } catch (error) {
-      console.error('AI 분석 오류:', error);
-      alert('AI 분석 중 오류가 발생했습니다.');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleMarketUpdate = async () => {
-    setIsUpdatingMarket(true);
-    try {
-      const targetDepts = selectedDeptFilter === '전체' ? departments : [selectedDeptFilter];
-      
-      for (const dept of targetDepts) {
-        const prompt = `너는 한국 HR 보상 전문가야. 2026년 한국 IT/스타트업 산업 기준, '${dept}'의 3~5년 차 평균 연봉을 추정해 줘. 결과는 반드시 다른 설명 없이 오직 JSON 형식 {"market_avg": 숫자만} 으로 반환해. 숫자 값은 연봉(원 단위, 예: 65000000)으로 작성해줘.`;
-
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error(`${dept} API 오류:`, errorData);
-          continue;
-        }
-
-        const data = await response.json();
-        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        
-        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) continue;
-        const result = JSON.parse(jsonMatch[0]);
-
-        if (result.market_avg) {
-          // 실시간 자사 평균가 계산
-          const deptProfiles = allProfiles.filter(p => p.department === dept);
-          const companyAvg = deptProfiles.length > 0 
-            ? Math.round(deptProfiles.reduce((acc, p) => acc + (p.current_salary || 0), 0) / deptProfiles.length)
-            : 0;
-
-          // 부서별 데이터 존재 여부 확인
-          const { data: existing } = await supabase
-            .from('market_benchmarks')
-            .select('id')
-            .eq('department', dept)
-            .single();
-
-          if (existing) {
-            await supabase
-              .from('market_benchmarks')
-              .update({ 
-                market_avg: result.market_avg, 
-                company_avg: companyAvg,
-                updated_at: new Date() 
-              })
-              .eq('id', existing.id);
-          } else {
-            await supabase
-              .from('market_benchmarks')
-              .insert({ 
-                department: dept,
-                market_avg: result.market_avg, 
-                company_avg: companyAvg
-              });
-          }
-        }
-      }
-      console.log('시장가 업데이트 완료. 새로고침 시작...');
-      await fetchData();
-      alert('시장가가 최신 정보로 업데이트되었습니다.');
-    } catch (error) {
-      console.error('시장가 업데이트 오류:', error);
-      alert('시장가 업데이트 중 오류가 발생했습니다.');
-    } finally {
-      setIsUpdatingMarket(false);
-    }
-  };
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase
@@ -413,17 +224,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   className="btn btn-primary w-full justify-center py-4 text-base"
                 >
                   즉시 수락 및 합의
-                </button>
-                <button 
-                  onClick={handleAIAnalysis} 
-                  disabled={isAnalyzing}
-                  className="btn btn-outline w-full justify-center py-4 text-base border-[var(--color-accent-2)] text-[var(--color-accent-2)] hover:bg-[var(--color-accent-2)]/5"
-                >
-                  {isAnalyzing ? (
-                    <span className="flex items-center gap-2"><Loader2 size={18} className="animate-spin" /> 분석 중...</span>
-                  ) : (
-                    <span className="flex items-center gap-2"><Zap size={18} /> AI 심층 분석 실행</span>
-                  )}
                 </button>
                 <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-base">
                   조건 역제시
@@ -502,16 +302,16 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             ))}
           </div>
 
-          {/* 중단: 예산 / 내부 형평성 산점도 / 부서 진행도 */}
-          <div className="grid grid-cols-12 gap-6 h-[45%] min-h-0 shrink-0">
-            {/* 1. 예산 (3/12) */}
-            <div className="col-span-3 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
-              <h3 className="text-sm font-black flex items-center gap-2 mb-4">
-                <TrendingUp size={18} className="text-[var(--color-primary)]" />
+          {/* 주요 현황 위젯 한 줄 배치 */}
+          <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
+            {/* 1. 예산 통제 현황 (4/12) */}
+            <div className="col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
+              <h3 className="text-base font-black flex items-center gap-3 mb-8">
+                <TrendingUp size={20} className="text-[var(--color-primary)]" />
                 예산 통제 현황
               </h3>
               <div className="flex-1 flex flex-col items-center justify-center relative">
-                <div className="relative w-44 h-44 flex items-center justify-center">
+                <div className="relative w-52 h-52 flex items-center justify-center">
                   <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 100 100">
                     <circle 
                       cx="50" cy="50" r="40" fill="transparent" stroke="#f9fafb" strokeWidth="10"
@@ -524,211 +324,66 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                     />
                   </svg>
                   <div className="text-center z-10">
-                    <p className="text-4xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
-                    <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
+                    <p className="text-5xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Used</p>
                   </div>
                 </div>
-                <div className="w-full mt-8 grid grid-cols-2 gap-6 text-center border-t border-gray-50 pt-6">
+                <div className="w-full mt-10 grid grid-cols-2 gap-8 text-center border-t border-gray-50 pt-8">
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">총 인상 예산</p>
-                    <p className="text-base font-black text-gray-900">{(budget.total_budget / 10000).toLocaleString()}만원</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase mb-2 tracking-tight">총 인상 예산</p>
+                    <p className="text-xl font-black text-gray-900">{(budget.total_budget / 10000).toLocaleString()}만원</p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase mb-1.5 tracking-tight">현재 사용액</p>
-                    <p className="text-base font-black text-[var(--color-secondary)]">{(budget.used_budget / 10000).toLocaleString()}만원</p>
+                    <p className="text-[11px] font-bold text-gray-400 uppercase mb-2 tracking-tight">현재 사용액</p>
+                    <p className="text-xl font-black text-[var(--color-secondary)]">{(budget.used_budget / 10000).toLocaleString()}만원</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* 2. 내부 형평성 산점도 (6/12) */}
-            <div className="col-span-6 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0 relative">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-black flex items-center gap-2">
-                  <Target size={18} className="text-[var(--color-primary)]" />
-                  내부 형평성 산점도 (Pay Parity)
-                </h3>
-                <div className="flex gap-3">
-                  {Object.entries(deptColors).map(([dept, color]) => (
-                    <div key={dept} className="flex items-center gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }}></div>
-                      <span className="text-[8px] font-bold text-gray-400">{dept.replace('팀', '')}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex-1 relative border-l border-b border-gray-100 mt-2 mb-6 ml-8">
-                {/* Y축 라벨 */}
-                <div className="absolute -left-10 top-0 h-full flex flex-col justify-between text-[8px] font-bold text-gray-400 py-1">
-                  <span>1.0억</span>
-                  <span>0.5억</span>
-                  <span>0원</span>
-                </div>
-                {/* X축 라벨 */}
-                <div className="absolute -bottom-6 left-0 w-full flex justify-between text-[8px] font-bold text-gray-400 px-2">
-                  {Object.keys(positionWeight).map(p => <span key={p}>{p}</span>)}
-                </div>
-
-                {/* 그리드 라인 */}
-                <div className="absolute inset-0 flex flex-col justify-between opacity-5 pointer-events-none">
-                  {[1, 2, 3, 4].map(i => <div key={i} className="w-full border-t border-black"></div>)}
-                </div>
-
-                {/* 점들 */}
-                {allProfiles.map((p, i) => {
-                  const x = ((positionWeight[p.position] - 1) / 6) * 100;
-                  const salary = p.current_salary || 0;
-                  const y = Math.min((salary / 100000000) * 100, 100);
-                  return (
-                    <motion.div 
-                      key={p.id}
-                      initial={{ scale: 0, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="absolute w-3 h-3 rounded-full border-2 border-white shadow-sm cursor-pointer hover:scale-150 transition-transform z-10"
-                      style={{ 
-                        left: `${x}%`, 
-                        bottom: `${y}%`, 
-                        backgroundColor: deptColors[p.department] || '#ccc',
-                        transform: 'translate(-50%, 50%)'
-                      }}
-                      title={`${p.full_name} (${p.position}): ${salary.toLocaleString()}원`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. 부서별 협상 진행도 (3/12) - 축소형 */}
-            <div className="col-span-3 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
-              <h3 className="text-sm font-black flex items-center gap-2 mb-4">
-                <RefreshCw size={18} className="text-[var(--color-secondary)]" />
+            {/* 2. 부서별 협상 진행도 (4/12) */}
+            <div className="col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
+              <h3 className="text-base font-black flex items-center gap-3 mb-8">
+                <RefreshCw size={20} className="text-[var(--color-secondary)]" />
                 협상 진행도
               </h3>
-              <div className="flex-1 space-y-3 overflow-y-auto pr-1">
+              <div className="flex-1 space-y-5 overflow-y-auto pr-2">
                 {departments.map(dept => {
                   const deptNegs = negotiations.filter(n => n.department === dept);
                   const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
                   const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
                   return (
-                    <div key={dept} className="space-y-1">
-                      <div className="flex justify-between items-center text-xs font-bold">
+                    <div key={dept} className="space-y-2">
+                      <div className="flex justify-between items-center text-sm font-bold">
                         <span className="text-gray-600">{dept}</span>
                         <span className="text-[var(--color-primary)]">{Math.round(percent)}%</span>
                       </div>
-                      <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden">
-                        <div className="h-full bg-[var(--color-primary)]" style={{ width: `${percent}%` }} />
+                      <div className="h-2.5 bg-gray-50 rounded-full overflow-hidden">
+                        <div className="h-full bg-[var(--color-primary)] transition-all duration-1000" style={{ width: `${percent}%` }} />
                       </div>
                     </div>
                   );
                 })}
               </div>
             </div>
-          </div>
 
-          {/* 하단: 벤치마크 / 리스크 / 알림 */}
-          <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
-            {/* 4. 시장 벤치마크 (4/12) */}
-            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-black flex items-center gap-2">
-                  <BarChart2 size={18} className="text-[var(--color-primary)]" />
-                  시장가 비교
-                </h3>
-                <div className="flex items-center gap-2">
-                  <button 
-                    onClick={handleMarketUpdate}
-                    disabled={isUpdatingMarket}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[var(--color-primary)]/5 text-[var(--color-primary)] text-[10px] font-black hover:bg-[var(--color-primary)]/10 transition-all disabled:opacity-50"
-                  >
-                    {isUpdatingMarket ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={12} />
-                    )}
-                    AI 업데이트
-                  </button>
-                  <select 
-                    className="text-[9px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
-                    value={selectedDeptFilter}
-                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
-                  >
-                    <option value="전체">전체</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
-                {benchmarks.filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter).length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center gap-2 text-gray-300 opacity-60">
-                    <BarChart2 size={24} strokeWidth={1} />
-                    <p className="text-[8px] font-bold">데이터가 없습니다. AI 업데이트를 눌러주세요.</p>
-                  </div>
-                ) : (
-                  benchmarks
-                    .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
-                    .map((b) => {
-                      const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
-                      return (
-                        <div key={b.id} className="flex-1 flex flex-col items-center gap-2 h-full min-w-0 group relative">
-                          <div className="flex-1 w-full flex items-end justify-center gap-1.5 min-h-0">
-                            <motion.div 
-                              initial={{ height: 0 }}
-                              animate={{ height: `${(b.market_avg / max) * 100}%` }}
-                              className="w-full max-w-[14px] bg-gray-100 rounded-t-md transition-all duration-500 hover:bg-gray-200 cursor-help" 
-                              title={`시장 평균: ${(b.market_avg / 10000).toLocaleString()}만원`}
-                            ></motion.div>
-                            <motion.div 
-                              initial={{ height: 0 }}
-                              animate={{ height: `${(b.company_avg / max) * 100}%` }}
-                              className="w-full max-w-[14px] bg-[var(--color-primary)] rounded-t-md transition-all duration-500 hover:opacity-80 cursor-help shadow-sm" 
-                              style={{ borderBottom: '2px solid rgba(0,0,0,0.05)' }}
-                              title={`자사 평균: ${(b.company_avg / 10000).toLocaleString()}만원`}
-                            ></motion.div>
-                          </div>
-                          <span className="text-[7px] font-black text-gray-400 truncate w-full text-center uppercase tracking-tighter">
-                            {b.department.replace('팀', '')}
-                          </span>
-                        </div>
-                      );
-                    })
-                )}
-              </div>
-            </div>
-
-            {/* 5. 고위험 리스크 (4/12) */}
-            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
-              <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-red-500">
-                <AlertCircle size={18} />
-                고위험 리스크
-              </h3>
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                {risks.map((risk) => (
-                  <div key={risk.id} className="p-2.5 rounded-xl bg-red-50/50 border border-red-50 flex flex-col">
-                    <p className="font-black text-[10px] text-gray-900 mb-0.5">{risk.employee_name} <span className="text-[8px] text-gray-400">({risk.department})</span></p>
-                    <p className="text-[9px] text-red-700/80 font-medium truncate">{risk.reason}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 6. 실시간 알림 (4/12) */}
-            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
-              <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-[var(--color-accent-2)]">
-                <Bell size={18} />
+            {/* 3. 실시간 알림 (4/12) */}
+            <div className="col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col">
+              <h3 className="text-base font-black flex items-center gap-3 mb-8 text-[var(--color-accent-2)]">
+                <Bell size={20} />
                 협상 알림
               </h3>
-              <div className="flex-1 overflow-y-auto space-y-1 pr-1">
-                {negotiations.slice(0, 4).map((neg, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group">
-                    <div className="w-7 h-7 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">
-                      <Clock size={12} />
+              <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                {negotiations.slice(0, 8).map((neg, i) => (
+                  <div key={i} className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group border border-transparent hover:border-gray-100">
+                    <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-accent-2)]/10 group-hover:text-[var(--color-accent-2)] transition-all">
+                      <Clock size={18} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-bold text-gray-900 truncate">
+                      <p className="text-[13px] font-bold text-gray-900 truncate">
                         <span className="text-[var(--color-primary)]">{neg.evaluatee_name}</span>님의 새로운 활동
                       </p>
-                      <p className="text-[8px] text-gray-400 font-medium">
+                      <p className="text-[11px] text-gray-400 font-medium mt-0.5">
                         {new Date(neg.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>

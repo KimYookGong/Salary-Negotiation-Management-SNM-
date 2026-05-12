@@ -61,25 +61,7 @@ CREATE TABLE IF NOT EXISTS budgets (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. 인재 리스크 테이블
-CREATE TABLE IF NOT EXISTS risk_assessments (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  employee_id TEXT NOT NULL,
-  employee_name TEXT NOT NULL,
-  department department_type NOT NULL,
-  risk_level TEXT NOT NULL, -- 'High', 'Medium', 'Low'
-  reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
--- 6. 시장 벤치마크 테이블
-CREATE TABLE IF NOT EXISTS market_benchmarks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  department department_type NOT NULL,
-  market_avg BIGINT NOT NULL,
-  company_avg BIGINT NOT NULL,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- 7. 알림 테이블 (영속성용)
 CREATE TABLE IF NOT EXISTS notifications (
@@ -109,15 +91,9 @@ CREATE POLICY "Employees are viewable by everyone" ON employees FOR SELECT USING
 
 ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Budgets are viewable by everyone" ON budgets;
-CREATE POLICY "Budgets are viewable by everyone" ON budgets FOR SELECT USING (true);
+CREATE POLICY "Allow all actions for now" ON budgets FOR ALL USING (true);
 
-ALTER TABLE risk_assessments ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Risk assessments are viewable by everyone" ON risk_assessments;
-CREATE POLICY "Risk assessments are viewable by everyone" ON risk_assessments FOR SELECT USING (true);
 
-ALTER TABLE market_benchmarks ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Market benchmarks are viewable by everyone" ON market_benchmarks;
-CREATE POLICY "Market benchmarks are viewable by everyone" ON market_benchmarks FOR SELECT USING (true);
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can see their own notifications" ON notifications;
