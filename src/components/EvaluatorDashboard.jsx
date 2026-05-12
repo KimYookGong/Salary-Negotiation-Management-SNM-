@@ -107,60 +107,63 @@ const EvaluatorDashboard = () => {
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className="space-y-8 w-full max-w-[1600px] mx-auto">
+      {/* Stats Overview - 4 columns in a row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           { label: '전체 검토 대상', value: '12명', icon: Users, color: 'var(--color-secondary)' },
           { label: '승인 대기', value: '5건', icon: MessageSquare, color: 'var(--color-accent-2)' },
           { label: '최종 합의 완료', value: '7건', icon: Check, color: 'var(--color-accent-1)' },
           { label: '평균 인상률', value: '7.2%', icon: ArrowUpRight, color: 'var(--color-primary)' },
         ].map((stat, i) => (
-          <div key={i} className="card flex items-center gap-4">
-            <div className="p-3 rounded-xl" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
+          <div key={i} className="card flex items-center gap-4 hover:shadow-lg transition-shadow">
+            <div className="p-3 rounded-xl flex-shrink-0" style={{ backgroundColor: `${stat.color}15`, color: stat.color }}>
               <stat.icon size={24} />
             </div>
-            <div>
-              <p className="text-xs text-[var(--text-muted)] font-medium">{stat.label}</p>
-              <p className="text-xl font-bold">{stat.value}</p>
+            <div className="min-w-0">
+              <p className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-wider truncate">{stat.label}</p>
+              <p className="text-2xl font-black text-[var(--color-primary)]">{stat.value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* User List Sidebar */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="card p-4">
-            <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-main)] rounded-lg mb-4">
-              <Search size={18} className="text-[var(--text-muted)]" />
-              <input type="text" placeholder="검색..." className="bg-transparent border-none outline-none text-sm w-full" />
-              <Filter size={18} className="text-[var(--text-muted)]" />
+      {/* Main Content Area - 2 Panels */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Panel - Evaluatee List (4 columns) */}
+        <div className="lg:col-span-4 space-y-4 sticky top-24">
+          <div className="card p-0 overflow-hidden">
+            <div className="p-4 bg-gray-50 border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-2 px-3 py-2.5 bg-white border border-[var(--border-color)] rounded-xl shadow-sm">
+                <Search size={18} className="text-[var(--text-muted)]" />
+                <input type="text" placeholder="이름 또는 부서 검색..." className="bg-transparent border-none outline-none text-sm w-full font-medium" />
+                <Filter size={18} className="text-[var(--text-muted)]" />
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
               {users.map((user) => (
                 <div 
                   key={user.id}
                   onClick={() => setSelectedUser(user)}
-                  className={`p-4 rounded-xl cursor-pointer transition-all ${
-                    selectedUser?.id === user.id ? 'bg-[var(--color-primary)] text-white' : 'hover:bg-[var(--bg-main)]'
+                  className={`p-5 cursor-pointer transition-all border-b border-[var(--border-color)] last:border-0 ${
+                    selectedUser?.id === user.id ? 'bg-[var(--color-primary)] text-white' : 'hover:bg-gray-50'
                   }`}
                 >
-                  <div className="flex justify-between items-start mb-1">
-                    <p className="font-bold">{user.name}</p>
-                    <p className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                      selectedUser?.id === user.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="font-bold text-base">{user.name}</p>
+                    <p className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-md ${
+                      selectedUser?.id === user.id ? 'bg-white/20 text-white' : 'bg-[var(--color-secondary)]/10 text-[var(--color-secondary)]'
                     }`}>
                       {user.dept}
                     </p>
                   </div>
                   <div className="flex justify-between items-center">
-                    <p className={`text-xs ${selectedUser?.id === user.id ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
-                      요구안: {user.proposal}
+                    <p className={`text-xs font-medium ${selectedUser?.id === user.id ? 'text-white/80' : 'text-[var(--text-muted)]'}`}>
+                      희망: {user.proposal}
                     </p>
                     <div className="flex items-center gap-1">
-                      <span className="text-[10px] font-bold">★</span>
-                      <span className="text-xs font-bold">{user.score}</span>
+                      <span className="text-[10px] font-bold text-yellow-400">★</span>
+                      <span className={`text-xs font-bold ${selectedUser?.id === user.id ? 'text-white' : 'text-[var(--color-primary)]'}`}>{user.score}</span>
                     </div>
                   </div>
                 </div>
@@ -169,8 +172,8 @@ const EvaluatorDashboard = () => {
           </div>
         </div>
 
-        {/* Detailed Insight Area */}
-        <div className="lg:col-span-2 space-y-6">
+        {/* Right Panel - Detail View (8 columns) */}
+        <div className="lg:col-span-8 space-y-6">
           <AnimatePresence mode="wait">
             {selectedUser ? (
               <motion.div 

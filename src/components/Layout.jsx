@@ -60,7 +60,7 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 mt-4 space-y-2">
+        <nav className="flex-1 px-4 mt-4 space-y-1">
           {menuItems.map((item) => (
             <SidebarItem
               key={item.id}
@@ -72,7 +72,16 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {/* Role Switcher moved to sidebar bottom as per request */}
+          <button 
+            onClick={() => setCurrentTab('switch-role')}
+            className="w-full flex items-center gap-4 p-3 rounded-lg text-white/60 hover:bg-white/5 hover:text-white transition-all"
+            title={collapsed ? "모드 전환" : ""}
+          >
+            <RefreshCw size={20} />
+            {!collapsed && <span className="text-sm font-medium">평가자 모드로 전환</span>}
+          </button>
           <SidebarItem icon={LogOut} label="로그아웃" collapsed={collapsed} />
         </div>
       </aside>
@@ -88,23 +97,26 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
           </div>
           
           <div className="flex items-center gap-6">
-            <button className="relative text-[var(--text-muted)] hover:text-[var(--color-primary)]">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
-            </button>
-            
-            <div className="h-8 w-[1px] bg-[var(--border-color)]"></div>
-            
-            <div className="flex items-center gap-3">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-[var(--text-main)]">홍길동</p>
-                <p className="text-xs text-[var(--text-muted)]">
-                  {userRole === 'evaluator' ? '인사팀 팀장' : '프론트엔드 개발자'}
-                </p>
+            <div className="flex items-center gap-4">
+              <button className="relative text-[var(--text-muted)] hover:text-[var(--color-primary)] p-2">
+                <Bell size={20} />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--color-accent-2)] rounded-full border-2 border-white"></span>
+              </button>
+              
+              <div className="flex items-center gap-3 pl-4 border-l border-[var(--border-color)]">
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-bold text-[var(--text-main)]">홍길동</p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium">인사팀 팀장</p>
+                </div>
+                <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
+                  <User size={20} />
+                </div>
               </div>
-              <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold">
-                <User size={20} />
-              </div>
+
+              <button className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2">
+                <LogOut size={18} />
+                <span>로그아웃</span>
+              </button>
             </div>
           </div>
         </header>
