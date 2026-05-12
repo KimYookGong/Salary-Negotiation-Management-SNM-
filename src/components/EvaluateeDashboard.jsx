@@ -92,6 +92,21 @@ const EvaluateeDashboard = ({ profile }) => {
     if (error) {
       alert('제출 중 오류가 발생했습니다.');
     } else {
+      // 평가자에게 알림 전송 로직 추가
+      const { data: evaluators } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('role', 'evaluator');
+      
+      if (evaluators && evaluators.length > 0) {
+        const notifications = evaluators.map(ev => ({
+          user_id: ev.id,
+          content: `${profile.full_name}님이 새로운 협상 제안을 제출했습니다.`,
+          is_read: false
+        }));
+        await supabase.from('notifications').insert(notifications);
+      }
+
       alert('성공적으로 제출되었습니다.');
       fetchNegotiation();
     }

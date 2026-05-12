@@ -14,7 +14,9 @@ import {
   ChevronLeft,
   Bell,
   Clock,
-  AlertCircle
+  AlertCircle,
+  BarChart2,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -89,7 +91,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [benchmarks, setBenchmarks] = useState([]);
   const [selectedDeptFilter, setSelectedDeptFilter] = useState('전체');
 
-  const departments = ['개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀'];
+  const departments = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
 
   // 탭 변경 시 상세 보기 초기화
   useEffect(() => {
@@ -120,6 +122,18 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
 
   useEffect(() => {
     fetchData();
+    
+    // 실시간 구독 (협상 상태 변화 감지)
+    const channel = supabase
+      .channel('dashboard-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'negotiations' }, () => {
+        fetchData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
@@ -151,16 +165,16 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
 
   if (selectedNegotiation) {
     return (
-      <div className="space-y-6 max-w-[1400px] mx-auto pb-12">
+      <div className="space-y-6 max-w-[1400px] mx-auto pb-12 h-full flex flex-col">
         <button 
           onClick={() => setSelectedNegotiation(null)}
-          className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 px-4 py-2 rounded-lg transition-all"
+          className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 px-4 py-2 rounded-lg transition-all w-fit"
         >
           <ChevronLeft size={18} /> 목록으로 돌아가기
         </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 flex-1 overflow-hidden">
+          <div className="lg:col-span-1 space-y-6 overflow-y-auto pr-2">
             <div className="card border-l-8 border-l-[var(--color-primary)] shadow-xl">
               <div className="flex items-center gap-4 mb-8">
                 <div className="w-20 h-20 bg-[var(--color-secondary)] rounded-3xl flex items-center justify-center text-3xl font-black text-white shadow-lg">
@@ -207,7 +221,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </div>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-6 overflow-y-auto pr-2">
             <div className="grid grid-cols-1 gap-6">
               <div className="card shadow-xl">
                 <h3 className="text-lg font-black mb-5 flex items-center gap-2 text-[var(--color-primary)]">
@@ -250,162 +264,178 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     );
   }
 
-  const budgetPercent = (budget.used_budget / budget.total_budget) * 100;
+  const budgetPercent = budget.total_budget > 0 ? (budget.used_budget / budget.total_budget) * 100 : 0;
 
   return (
-    <div className="space-y-8 w-full max-w-[1600px] mx-auto pb-12">
+    <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
         <>
-          {/* 상단 (요약 카드) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* 상단: 요약 카드 (슬림형) */}
+          <div className="grid grid-cols-4 gap-4 shrink-0">
             {stats.map((stat, i) => (
-              <div key={i} className="card flex items-center gap-5 hover:shadow-2xl transition-all border-none bg-white shadow-lg">
-                <div className="p-4 rounded-2xl flex-shrink-0 shadow-inner" style={{ backgroundColor: `${stat.color}10`, color: stat.color }}>
-                  <stat.icon size={28} />
+              <div key={i} className="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-4 border border-gray-100">
+                <div className="p-2.5 rounded-xl" style={{ backgroundColor: `${stat.color}10`, color: stat.color }}>
+                  <stat.icon size={20} />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[11px] text-[var(--text-muted)] font-black uppercase tracking-[0.1em] mb-1">{stat.label}</p>
-                  <p className="text-3xl font-black text-[var(--color-primary)]">{stat.value}</p>
+                <div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{stat.label}</p>
+                  <p className="text-xl font-black text-gray-900">{stat.value}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          {/* 중단 (인사이트 영역) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* 좌측: 예산 통제 현황 */}
-            <div className="card shadow-xl border-none">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-xl font-black flex items-center gap-2">
-                  <TrendingUp size={24} className="text-[var(--color-primary)]" />
+          {/* 메인 섹션: 3열 레이아웃 */}
+          <div className="grid grid-cols-12 gap-6 flex-1 min-h-0">
+            {/* 좌측: 예산 및 벤치마크 (4칸) */}
+            <div className="col-span-4 flex flex-col gap-6 min-h-0">
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col">
+                <h3 className="text-sm font-black flex items-center gap-2 mb-4">
+                  <TrendingUp size={18} className="text-[var(--color-primary)]" />
                   예산 통제 현황
                 </h3>
-                <span className="text-sm font-bold text-[var(--text-muted)]">{budget.year}년 기준</span>
-              </div>
-              <div className="space-y-8 py-4">
-                <div className="relative pt-12 flex flex-col items-center justify-center">
-                  {/* 도넛 차트 대용 시각화 */}
-                  <div className="relative w-48 h-48 rounded-full border-[16px] border-gray-100 flex items-center justify-center">
-                    <svg className="absolute inset-[-16px] w-[calc(100%+32px)] h-[calc(100%+32px)] -rotate-90">
+                <div className="flex-1 flex flex-col items-center justify-center relative">
+                  <div className="relative w-32 h-32 rounded-full border-[10px] border-gray-50 flex items-center justify-center">
+                    <svg className="absolute inset-[-10px] w-[calc(100%+20px)] h-[calc(100%+20px)] -rotate-90">
                       <circle 
-                        cx="112" cy="112" r="96" fill="transparent" stroke="var(--color-primary)" strokeWidth="16"
-                        strokeDasharray={`${(budgetPercent * 603) / 100} 603`}
+                        cx="76" cy="76" r="66" fill="transparent" stroke="var(--color-primary)" strokeWidth="10"
+                        strokeDasharray={`${(budgetPercent * 414) / 100} 414`}
                         className="transition-all duration-1000"
                       />
                     </svg>
                     <div className="text-center">
-                      <p className="text-4xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
-                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Used</p>
+                      <p className="text-2xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Used</p>
+                    </div>
+                  </div>
+                  <div className="w-full mt-6 grid grid-cols-2 gap-4 text-center">
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">총 예산</p>
+                      <p className="text-sm font-black">{(budget.total_budget / 100000000).toFixed(1)}억</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mb-1">사용액</p>
+                      <p className="text-sm font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억</p>
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50">
-                  <div>
-                    <p className="text-[10px] font-black text-[var(--text-muted)] uppercase mb-1">총 인상 예산</p>
-                    <p className="text-lg font-black">{(budget.total_budget / 100000000).toFixed(1)}억원</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-black text-[var(--text-muted)] uppercase mb-1">현재 사용액</p>
-                    <p className="text-lg font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억원</p>
-                  </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-black flex items-center gap-2">
+                    <BarChart2 size={18} className="text-[var(--color-primary)]" />
+                    시장가 비교 분석
+                  </h3>
+                  <select 
+                    className="text-[10px] font-bold bg-gray-50 border-none outline-none rounded-lg px-2 py-1"
+                    value={selectedDeptFilter}
+                    onChange={(e) => setSelectedDeptFilter(e.target.value)}
+                  >
+                    <option value="전체">전체</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+                <div className="flex-1 flex items-end justify-between gap-2 px-2 pb-2 min-h-0">
+                  {benchmarks
+                    .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
+                    .map((b) => {
+                      const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
+                      return (
+                        <div key={b.id} className="flex-1 flex items-end gap-1 group relative h-full max-w-[40px]">
+                          <div className="flex-1 bg-gray-100 rounded-t-sm" style={{ height: `${(b.market_avg / max) * 100}%` }}></div>
+                          <div className="flex-1 bg-[var(--color-primary)] rounded-t-sm" style={{ height: `${(b.company_avg / max) * 100}%` }}></div>
+                          <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[8px] font-bold text-gray-400">
+                            {b.department.replace('팀', '')}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </div>
 
-            {/* 우측: AI 인재 리스크 관리 */}
-            <div className="card shadow-xl border-none">
-              <h3 className="text-xl font-black mb-8 flex items-center gap-2">
-                <AlertCircle size={24} className="text-red-500" />
-                AI 인재 리스크 관리 (High)
+            {/* 중앙: 부서별 진행도 (4칸) */}
+            <div className="col-span-4 bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col min-h-0">
+              <h3 className="text-sm font-black flex items-center gap-2 mb-6">
+                <RefreshCw size={18} className="text-[var(--color-secondary)]" />
+                부서별 협상 진행도
               </h3>
-              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
-                {risks.length > 0 ? risks.map((risk) => (
-                  <div key={risk.id} className="p-5 rounded-2xl bg-red-50/30 border border-red-50 flex gap-4 hover:bg-red-50 transition-all cursor-default">
-                    <div className="p-2 h-fit bg-red-100 rounded-xl text-red-600">
-                      <AlertCircle size={20} />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-black text-sm text-gray-900">{risk.employee_name} <span className="text-xs font-bold text-gray-500 ml-1">({risk.department})</span></p>
-                        <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-black rounded-full">RISK</span>
-                      </div>
-                      <p className="text-xs text-red-700 font-medium leading-relaxed">{risk.reason}</p>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="py-20 text-center text-gray-400 font-medium">현재 고위험 대상자가 없습니다.</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 하단 (심층 데이터 영역) */}
-          <div className="card shadow-xl border-none">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-              <div>
-                <h3 className="text-2xl font-black text-[var(--color-primary)]">시장 벤치마크 비교 분석</h3>
-                <p className="text-sm font-bold text-[var(--text-muted)]">업계 평균 대비 자사 보상 수준을 부서별로 확인합니다.</p>
-              </div>
-              <select 
-                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-bold text-sm"
-                value={selectedDeptFilter}
-                onChange={(e) => setSelectedDeptFilter(e.target.value)}
-              >
-                <option value="전체">전체 부서</option>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-
-            <div className="relative h-[400px] flex items-end justify-between gap-4 px-4 pt-10 pb-12 border-b border-gray-100">
-              {/* 차트 배경 가로선 */}
-              <div className="absolute inset-0 flex flex-col justify-between py-10 pointer-events-none opacity-5">
-                {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-full border-t border-black"></div>)}
-              </div>
-
-              {benchmarks
-                .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
-                .map((b) => {
-                  const max = Math.max(b.market_avg, b.company_avg) * 1.2;
-                  const marketH = (b.market_avg / max) * 100;
-                  const companyH = (b.company_avg / max) * 100;
+              <div className="flex-1 space-y-5 overflow-y-auto pr-2">
+                {departments.map(dept => {
+                  const deptNegs = negotiations.filter(n => n.department === dept);
+                  const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
+                  const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
                   return (
-                    <div key={b.id} className="flex-1 flex flex-col items-center group relative h-full">
-                      <div className="flex-1 w-full flex items-end justify-center gap-2 px-2">
-                        {/* 시장 평균 바 */}
-                        <div className="relative group/market w-full max-w-[40px]">
-                          <motion.div 
-                            initial={{ height: 0 }} animate={{ height: `${marketH}%` }} 
-                            className="w-full bg-gray-200 rounded-t-lg group-hover/market:bg-gray-300 transition-colors"
-                          />
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/market:opacity-100 transition-opacity bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 font-bold">
-                            시장: {(b.market_avg / 10000).toLocaleString()}만
-                          </div>
-                        </div>
-                        {/* 자사 평균 바 */}
-                        <div className="relative group/company w-full max-w-[40px]">
-                          <motion.div 
-                            initial={{ height: 0 }} animate={{ height: `${companyH}%` }} 
-                            className="w-full bg-[var(--color-primary)] rounded-t-lg shadow-lg group-hover/company:bg-[var(--color-secondary)] transition-colors"
-                          />
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/company:opacity-100 transition-opacity bg-[var(--color-primary)] text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 font-bold">
-                            자사: {(b.company_avg / 10000).toLocaleString()}만
-                          </div>
-                        </div>
+                    <div key={dept} className="space-y-1.5">
+                      <div className="flex justify-between items-center text-[11px] font-bold">
+                        <span className="text-gray-700">{dept}</span>
+                        <span className="text-gray-400">{completed}/{deptNegs.length} 완료</span>
                       </div>
-                      <p className="mt-4 text-xs font-black text-gray-700 truncate w-full text-center">{b.department}</p>
+                      <div className="h-2 bg-gray-50 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }} 
+                          animate={{ width: `${percent}%` }} 
+                          className="h-full bg-[var(--color-primary)] rounded-full"
+                        />
+                      </div>
                     </div>
                   );
                 })}
-            </div>
-            
-            <div className="flex justify-center gap-6 mt-6">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-gray-200 rounded-sm"></div>
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Market Avg</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-[var(--color-primary)] rounded-sm"></div>
-                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Our Company</span>
+            </div>
+
+            {/* 우측: 인재 리스크 및 실시간 알림 (4칸) */}
+            <div className="col-span-4 flex flex-col gap-6 min-h-0">
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
+                <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-red-500">
+                  <AlertCircle size={18} />
+                  고위험 인재 리스크
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+                  {risks.length > 0 ? risks.map((risk) => (
+                    <div key={risk.id} className="p-3 rounded-xl bg-red-50/50 border border-red-50 flex gap-3">
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-1">
+                          <p className="font-black text-[11px] text-gray-900">{risk.employee_name} <span className="text-[9px] text-gray-400">({risk.department})</span></p>
+                          <span className="text-[8px] bg-red-500 text-white px-1.5 py-0.5 rounded-full font-black">HIGH</span>
+                        </div>
+                        <p className="text-[10px] text-red-700/80 font-medium leading-tight">{risk.reason}</p>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="flex-1 flex items-center justify-center text-[11px] text-gray-300 font-bold">대상자 없음</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex-1 flex flex-col min-h-0">
+                <h3 className="text-sm font-black flex items-center gap-2 mb-4 text-[var(--color-accent-2)]">
+                  <Bell size={18} />
+                  실시간 협상 알림
+                </h3>
+                <div className="flex-1 overflow-y-auto space-y-1 pr-2">
+                  {negotiations.slice(0, 5).map((neg, i) => (
+                    <div 
+                      key={i} 
+                      onClick={() => setSelectedNegotiation(neg)}
+                      className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-all">
+                        {neg.status === 'submitted' ? <AlertCircle size={14} className="text-orange-500" /> : <Clock size={14} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-gray-900 truncate">
+                          <span className="text-[var(--color-primary)]">{neg.evaluatee_name}</span>님이 제안을 제출함
+                        </p>
+                        <p className="text-[8px] text-gray-400 font-medium">
+                          {new Date(neg.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <ChevronRight size={14} className="text-gray-200 group-hover:text-[var(--color-primary)] transition-all" />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -413,65 +443,63 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       )}
 
       {currentTab === 'negotiation' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card p-0 border-none shadow-2xl overflow-hidden bg-white">
-          <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
             <div>
-              <h3 className="text-2xl font-black text-[var(--color-primary)] tracking-tight mb-2">협상 프로세스 관리</h3>
-              <p className="text-sm text-[var(--text-muted)] font-bold">전체 {filteredNegotiations.length}명의 피평가자 데이터를 관리 중입니다.</p>
+              <h3 className="text-xl font-black text-[var(--color-primary)] mb-1">협상 프로세스 관리</h3>
+              <p className="text-xs text-gray-400 font-bold">전체 {filteredNegotiations.length}명의 데이터 관리 중</p>
             </div>
-            <div className="flex gap-4">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors" size={20} />
-                <input 
-                  type="text" 
-                  placeholder="대상자 검색..."
-                  className="pl-12 pr-6 py-3 bg-gray-50 border-none rounded-2xl outline-none w-full md:w-80 transition-all focus:ring-2 focus:ring-[var(--color-primary)]/20 shadow-inner"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
+              <input 
+                type="text" 
+                placeholder="대상자 검색..."
+                className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl outline-none w-64 transition-all focus:ring-2 focus:ring-[var(--color-primary)]/10 text-sm font-medium"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-y-auto">
             <table className="w-full">
-              <thead className="bg-gray-50/50">
+              <thead className="bg-gray-50/50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">대상자 정보</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">현재 진행 상태</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">희망 연봉 및 조건</th>
-                  <th className="px-10 py-6 text-left text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">최종 업데이트</th>
-                  <th className="px-10 py-6 text-right text-[11px] font-black text-[var(--text-muted)] uppercase tracking-[0.2em]">상세 보기</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">대상자 정보</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 진행 상태</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">희망 연봉 및 조건</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">최종 업데이트</th>
+                  <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 보기</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredNegotiations.map((neg) => (
-                  <tr key={neg.id} className="hover:bg-[var(--color-primary)]/[0.02] transition-all cursor-pointer group" onClick={() => setSelectedNegotiation(neg)}>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center gap-5">
-                        <div className="w-12 h-12 rounded-2xl bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center font-black text-lg shadow-sm">
+                  <tr key={neg.id} className="hover:bg-gray-50/50 transition-all cursor-pointer group" onClick={() => setSelectedNegotiation(neg)}>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-[var(--color-primary)] flex items-center justify-center font-black text-sm group-hover:bg-[var(--color-primary)] group-hover:text-white transition-all">
                           {neg.evaluatee_name[0]}
                         </div>
                         <div>
-                          <p className="text-base font-black text-[var(--text-main)] group-hover:text-[var(--color-primary)] transition-colors">{neg.evaluatee_name}</p>
-                          <p className="text-xs text-[var(--text-muted)] font-bold">{neg.department} {neg.position}</p>
+                          <p className="text-sm font-black text-gray-900">{neg.evaluatee_name}</p>
+                          <p className="text-[10px] text-gray-400 font-bold">{neg.department} {neg.position}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-10 py-6">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black ${statusMap[neg.status]?.className}`}>
+                    <td className="px-8 py-5">
+                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black ${statusMap[neg.status]?.className}`}>
                         {statusMap[neg.status]?.label}
                       </span>
                     </td>
-                    <td className="px-10 py-6 font-black text-base text-[var(--color-primary)]">
+                    <td className="px-8 py-5 font-black text-sm text-[var(--color-primary)]">
                       {neg.evaluatee_proposal}
                     </td>
-                    <td className="px-10 py-6 text-xs text-[var(--text-muted)] font-bold">
+                    <td className="px-8 py-5 text-[10px] text-gray-400 font-bold">
                       {new Date(neg.updated_at).toLocaleDateString()}
                     </td>
-                    <td className="px-10 py-6 text-right">
-                      <div className="inline-flex p-2 rounded-xl bg-gray-50 text-gray-300 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-all shadow-inner">
-                        <ChevronRight size={20} />
+                    <td className="px-8 py-5 text-right">
+                      <div className="inline-flex p-1.5 rounded-lg text-gray-200 group-hover:bg-[var(--color-primary)] group-hover:text-white transition-all">
+                        <ChevronRight size={18} />
                       </div>
                     </td>
                   </tr>

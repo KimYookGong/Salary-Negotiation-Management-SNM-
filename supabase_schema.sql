@@ -1,6 +1,6 @@
 -- 0. 부서 및 직급 드롭다운(ENUM) 타입 생성 
 DO $$ BEGIN
-  CREATE TYPE department_type AS ENUM ('개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀');
+  CREATE TYPE department_type AS ENUM ('운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
