@@ -197,8 +197,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
         }
       `;
 
-      // API 호출 (사용자 요청 모델: gemini-2.5-flash -> 실존하는 2.0 Flash Exp로 보정하여 시도)
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
+      // API 호출 (더 안정적인 1.5 Flash 모델 사용)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -206,12 +206,18 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'API 호출 실패');
+      }
+
       const data = await response.json();
       const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
-      // JSON 추출 (마크다운 코드 블록 제거 등)
-      const jsonStr = rawText.replace(/```json|```/g, '').trim();
-      const result = JSON.parse(jsonStr);
+      // JSON 추출 개선 (정규식 사용)
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('응답에서 JSON을 찾을 수 없습니다.');
+      const result = JSON.parse(jsonMatch[0]);
 
       // 1. negotiations 테이블 score 업데이트
       const { error: scoreError } = await supabase
@@ -270,7 +276,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       for (const dept of targetDepts) {
         const prompt = `너는 한국 HR 보상 전문가야. 2026년 한국 IT/스타트업 산업 기준, '${dept}'의 3~5년 차 평균 연봉을 추정해 줘. 결과는 반드시 다른 설명 없이 오직 JSON 형식 {"market_avg": 숫자만} 으로 반환해. 숫자 값은 연봉(원 단위, 예: 65000000)으로 작성해줘.`;
 
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -278,10 +284,18 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           })
         });
 
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error(`${dept} API 오류:`, errorData);
+          continue;
+        }
+
         const data = await response.json();
         const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        const jsonStr = rawText.replace(/```json|```/g, '').trim();
-        const result = JSON.parse(jsonStr);
+        
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) continue;
+        const result = JSON.parse(jsonMatch[0]);
 
         if (result.market_avg) {
           const { error } = await supabase
