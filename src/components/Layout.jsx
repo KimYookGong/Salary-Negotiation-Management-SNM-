@@ -27,7 +27,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
   </div>
 );
 
-const Layout = ({ children, userRole, currentTab, setCurrentTab, session }) => {
+const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profile }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   const menuItems = [
@@ -113,12 +113,14 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session }) => {
               <div className="flex items-center gap-3 pl-4 border-l border-[var(--border-color)]">
                 <div className="text-right hidden sm:block">
                   <p className="text-sm font-bold text-[var(--text-main)] truncate max-w-[150px]">
-                    {session?.user?.email?.split('@')[0]}
+                    {profile?.full_name || session?.user?.email?.split('@')[0]}
                   </p>
-                  <p className="text-[10px] text-[var(--text-muted)] font-medium">{userRole === 'evaluator' ? '평가자' : '피평가자'}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium">
+                    {profile?.department} {profile?.employee_id ? `(${profile.employee_id})` : ''}
+                  </p>
                 </div>
-                <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
-                  <User size={20} />
+                <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden shadow-inner">
+                  {profile?.full_name ? profile.full_name[0] : <User size={20} />}
                 </div>
               </div>
 

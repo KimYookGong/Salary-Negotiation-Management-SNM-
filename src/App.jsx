@@ -7,20 +7,40 @@ import Auth from './components/Auth';
 
 function App() {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [userRole, setUserRole] = useState('evaluator'); // 'evaluatee' or 'evaluator'
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+
+  const fetchProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (!error && data) {
+      setProfile(data);
+      setUserRole(data.role || 'evaluatee');
+    }
+  };
 
   React.useEffect(() => {
     // Check active sessions and sets the user
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      if (session) fetchProfile(session.user.id);
       setLoading(false);
     });
 
     // Listen for changes on auth state (logged in, signed out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -65,6 +85,7 @@ function App() {
         currentTab={currentTab} 
         setCurrentTab={setCurrentTab}
         session={session}
+        profile={profile}
       >
         {renderContent()}
       </Layout>
