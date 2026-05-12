@@ -11,6 +11,12 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
+DO $$ BEGIN
+  CREATE TYPE performance_rating_type AS ENUM ('S', 'A', 'B', 'C', 'D');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
 -- 1. 연봉 협상 테이블
 CREATE TABLE IF NOT EXISTS negotiations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -18,7 +24,8 @@ CREATE TABLE IF NOT EXISTS negotiations (
   evaluatee_name TEXT NOT NULL,
   department department_type NOT NULL,
   position position_type,
-  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
+  current_salary BIGINT DEFAULT 0,
+  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
   status TEXT NOT NULL DEFAULT 'submitted',
   evaluatee_proposal TEXT,
   evaluator_proposal TEXT,
@@ -36,7 +43,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   full_name TEXT,
   department department_type,
   position position_type,
-  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
+  current_salary BIGINT DEFAULT 0,
+  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
   employee_id TEXT,
   role TEXT DEFAULT 'evaluatee',
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -48,7 +56,8 @@ CREATE TABLE IF NOT EXISTS employees (
   full_name TEXT NOT NULL,
   department department_type NOT NULL,
   position position_type NOT NULL,
-  current_salary BIGINT DEFAULT 0, -- [ADD] 현재 연봉 컬럼 추가
+  current_salary BIGINT DEFAULT 0,
+  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

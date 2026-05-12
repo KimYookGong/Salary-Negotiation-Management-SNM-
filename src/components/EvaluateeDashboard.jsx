@@ -67,7 +67,8 @@ const EvaluateeDashboard = ({ profile }) => {
       evaluatee_id: profile.id,
       evaluatee_name: profile.full_name,
       department: profile.department,
-      position: profile.position, // 추가
+      position: profile.position,
+      performance_rating: profile.performance_rating, // 추가
       jd: formData.jd,
       evaluatee_proposal: formData.proposal,
       reason: formData.reason,
@@ -114,6 +115,28 @@ const EvaluateeDashboard = ({ profile }) => {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
+      {/* User Info Bar */}
+      <div className="bg-white px-8 py-4 rounded-2xl shadow-sm border border-gray-100 flex flex-wrap items-center gap-x-12 gap-y-2">
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">성명</p>
+          <p className="text-sm font-black text-gray-900">{profile?.full_name}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">소속</p>
+          <p className="text-sm font-bold text-gray-700">{profile?.department}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">직급</p>
+          <p className="text-sm font-bold text-gray-700">{profile?.position}</p>
+        </div>
+        {profile?.performance_rating && (
+          <div>
+            <p className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest mb-0.5">평가등급</p>
+            <p className="text-sm font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md inline-block">{profile?.performance_rating}</p>
+          </div>
+        )}
+      </div>
+
       {/* Active Negotiation Card */}
       {negotiation ? (
         <motion.div 

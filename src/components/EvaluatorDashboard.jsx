@@ -199,7 +199,14 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 </div>
                 <div>
                   <h2 className="text-3xl font-black text-[var(--text-main)]">{selectedNegotiation.evaluatee_name}</h2>
-                  <p className="text-sm font-bold text-[var(--text-muted)] mt-1">{selectedNegotiation.department} {selectedNegotiation.position}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-sm font-bold text-[var(--text-muted)]">{selectedNegotiation.department} {selectedNegotiation.position}</p>
+                    {selectedNegotiation.performance_rating && (
+                      <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-0.5 rounded-md">
+                        {selectedNegotiation.performance_rating}등급
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               
@@ -419,6 +426,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
               <thead className="bg-gray-50/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">대상자 정보</th>
+                  <th className="px-8 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">평가등급</th>
                   <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 진행 상태</th>
                   <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">희망 연봉 및 조건</th>
                   <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">최종 업데이트</th>
@@ -438,6 +446,15 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                           <p className="text-[10px] text-gray-400 font-bold">{neg.department} {neg.position}</p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-8 py-5 text-center">
+                      {neg.performance_rating ? (
+                        <span className="text-xs font-black text-[var(--color-primary)] bg-[var(--color-primary)]/5 px-3 py-1 rounded-lg border border-[var(--color-primary)]/10">
+                          {neg.performance_rating}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-300">-</span>
+                      )}
                     </td>
                     <td className="px-8 py-5">
                       <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black ${statusMap[neg.status]?.className}`}>
