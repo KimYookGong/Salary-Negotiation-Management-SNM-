@@ -31,27 +31,62 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
 const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profile }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([
-    { id: 1, text: "권지민 주임님이 거절됨 상태입니다.", time: "2026. 5. 12. 오후 2:54:54" },
-    { id: 2, text: "새로운 협상 요청이 도착했습니다.", time: "2026. 5. 12. 오후 3:07:07" },
-    { id: 3, text: "이준영 대리님의 협상이 완료되었습니다.", time: "2026. 5. 12. 오후 3:15:20" },
-  ]);
+  const [notifications, setNotifications] = useState([]);
+
+  const fetchNotifications = async () => {
+    if (!session?.user?.id) return;
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', session.user.id)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false });
+    
+    if (!error) setNotifications(data);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    
+    // 실시간 알림 구독
+    const channel = supabase
+      .channel('notifications-changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'notifications',
+        filter: `user_id=eq.${session?.user?.id}`
+      }, () => {
+        fetchNotifications();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session]);
 
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
     { id: 'negotiation', label: userRole === 'evaluator' ? '협상 관리' : '연봉 협상', icon: MessageSquare },
   ];
 
-  if (userRole === 'evaluator') {
-    menuItems.push({ id: 'employees', label: '사원 관리', icon: User });
-  }
-
-  const markAsRead = (id) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const markAsRead = async (id) => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', id);
+    
+    if (!error) fetchNotifications();
   };
 
-  const markAllAsRead = () => {
-    setNotifications([]);
+  const markAllAsRead = async () => {
+    const { error } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('user_id', session.user.id);
+    
+    if (!error) fetchNotifications();
   };
 
   return (
@@ -148,10 +183,10 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                                 className="p-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors last:border-0"
                               >
                                 <p className="text-xs font-bold text-[var(--text-main)] mb-1">
-                                  {n.text}
+                                  {n.content}
                                 </p>
                                 <p className="text-[10px] text-[var(--text-muted)] uppercase font-medium">
-                                  {n.time}
+                                  {new Date(n.created_at).toLocaleString()}
                                 </p>
                               </div>
                             ))

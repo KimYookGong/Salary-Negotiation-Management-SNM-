@@ -83,67 +83,44 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
-  // 사원 관리 상태
-  const [employees, setEmployees] = useState([]);
-  const [newEmployee, setNewEmployee] = useState({ id: '', name: '', dept: '', pos: '' });
-  const [empLoading, setEmpLoading] = useState(false);
+  // 심층 데이터 상태
+  const [budget, setBudget] = useState({ total_budget: 1, used_budget: 0 });
+  const [risks, setRisks] = useState([]);
+  const [benchmarks, setBenchmarks] = useState([]);
+  const [selectedDeptFilter, setSelectedDeptFilter] = useState('전체');
 
   const departments = ['개발팀', '인사팀', '마케팅팀', '디자인팀', '영업팀', '경영지원팀', '기술지원팀', '데이터팀'];
-  const positions = ['사원', '주임', '대리', '과장', '차장', '부장', '본부장'];
 
   // 탭 변경 시 상세 보기 초기화
   useEffect(() => {
     setSelectedNegotiation(null);
   }, [currentTab]);
 
-  const fetchNegotiations = async () => {
+  const fetchData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('negotiations')
-      .select('*')
-      .order('updated_at', { ascending: false });
     
-    if (error) console.error('Error fetching:', error);
-    else setNegotiations(data);
+    // 1. 협상 데이터
+    const { data: negs } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
+    if (negs) setNegotiations(negs);
+
+    // 2. 예산 데이터 (최신 연도 하나만)
+    const { data: bud } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
+    if (bud) setBudget(bud);
+
+    // 3. 리스크 데이터 (High 레벨만)
+    const { data: rsk } = await supabase.from('risk_assessments').select('*').eq('risk_level', 'High');
+    if (rsk) setRisks(rsk);
+
+    // 4. 벤치마크 데이터
+    const { data: bmk } = await supabase.from('market_benchmarks').select('*');
+    if (bmk) setBenchmarks(bmk);
+
     setLoading(false);
   };
 
-  const fetchEmployees = async () => {
-    const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
-    if (!error) setEmployees(data);
-  };
-
   useEffect(() => {
-    fetchNegotiations();
-    fetchEmployees();
+    fetchData();
   }, []);
-
-  const handleAddEmployee = async (e) => {
-    e.preventDefault();
-    setEmpLoading(true);
-    const { error } = await supabase
-      .from('employees')
-      .insert([{ 
-        employee_id: newEmployee.id, 
-        full_name: newEmployee.name, 
-        department: newEmployee.dept, 
-        position: newEmployee.pos 
-      }]);
-    
-    if (error) alert('등록 실패: ' + error.message);
-    else {
-      alert('등록되었습니다.');
-      setNewEmployee({ id: '', name: '', dept: '', pos: '' });
-      fetchEmployees();
-    }
-    setEmpLoading(false);
-  };
-
-  const handleDeleteEmployee = async (id) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
-    const { error } = await supabase.from('employees').delete().eq('employee_id', id);
-    if (!error) fetchEmployees();
-  };
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase
@@ -154,7 +131,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     if (error) alert('오류 발생');
     else {
       alert('반영되었습니다.');
-      fetchNegotiations();
+      fetchData();
       setSelectedNegotiation(null);
       setIsPopupOpen(false);
     }
@@ -273,10 +250,13 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     );
   }
 
+  const budgetPercent = (budget.used_budget / budget.total_budget) * 100;
+
   return (
     <div className="space-y-8 w-full max-w-[1600px] mx-auto pb-12">
       {currentTab === 'dashboard' && (
         <>
+          {/* 상단 (요약 카드) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {stats.map((stat, i) => (
               <div key={i} className="card flex items-center gap-5 hover:shadow-2xl transition-all border-none bg-white shadow-lg">
@@ -291,67 +271,141 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             ))}
           </div>
 
-          <div className="lg:col-span-12 space-y-8">
-            {/* 대시보드 보강: 부서별 협상 현황 차트 대용 UI */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="card shadow-xl border-none">
-                <h3 className="text-xl font-black mb-8 flex items-center gap-2">
+          {/* 중단 (인사이트 영역) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* 좌측: 예산 통제 현황 */}
+            <div className="card shadow-xl border-none">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-xl font-black flex items-center gap-2">
                   <TrendingUp size={24} className="text-[var(--color-primary)]" />
-                  부서별 협상 진행도
+                  예산 통제 현황
                 </h3>
-                <div className="space-y-6">
-                  {departments.map(dept => {
-                    const deptNegs = negotiations.filter(n => n.department === dept);
-                    const completed = deptNegs.filter(n => n.status === 'final_agreement').length;
-                    const percent = deptNegs.length ? (completed / deptNegs.length) * 100 : 0;
-                    return (
-                      <div key={dept} className="space-y-2">
-                        <div className="flex justify-between items-center text-sm font-bold">
-                          <span>{dept}</span>
-                          <span className="text-[var(--text-muted)]">{completed}/{deptNegs.length} 완료</span>
-                        </div>
-                        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                          <motion.div 
-                            initial={{ width: 0 }} 
-                            animate={{ width: `${percent}%` }} 
-                            className="h-full bg-[var(--color-primary)] rounded-full"
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                <span className="text-sm font-bold text-[var(--text-muted)]">{budget.year}년 기준</span>
+              </div>
+              <div className="space-y-8 py-4">
+                <div className="relative pt-12 flex flex-col items-center justify-center">
+                  {/* 도넛 차트 대용 시각화 */}
+                  <div className="relative w-48 h-48 rounded-full border-[16px] border-gray-100 flex items-center justify-center">
+                    <svg className="absolute inset-[-16px] w-[calc(100%+32px)] h-[calc(100%+32px)] -rotate-90">
+                      <circle 
+                        cx="112" cy="112" r="96" fill="transparent" stroke="var(--color-primary)" strokeWidth="16"
+                        strokeDasharray={`${(budgetPercent * 603) / 100} 603`}
+                        className="transition-all duration-1000"
+                      />
+                    </svg>
+                    <div className="text-center">
+                      <p className="text-4xl font-black text-[var(--color-primary)]">{Math.round(budgetPercent)}%</p>
+                      <p className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">Used</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-50">
+                  <div>
+                    <p className="text-[10px] font-black text-[var(--text-muted)] uppercase mb-1">총 인상 예산</p>
+                    <p className="text-lg font-black">{(budget.total_budget / 100000000).toFixed(1)}억원</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-[var(--text-muted)] uppercase mb-1">현재 사용액</p>
+                    <p className="text-lg font-black text-[var(--color-secondary)]">{(budget.used_budget / 100000000).toFixed(1)}억원</p>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div className="card p-0 overflow-hidden border-none shadow-2xl flex flex-col">
-                <div className="p-8 bg-white border-b border-gray-50 flex justify-between items-center">
-                  <h3 className="text-xl font-black text-[var(--color-primary)] flex items-center gap-2">
-                    <Bell size={24} className="text-[var(--color-accent-2)]" />
-                    실시간 협상 알림
-                  </h3>
-                </div>
-                <div className="p-4 space-y-2 overflow-y-auto max-h-[600px]">
-                  {negotiations.slice(0, 8).map((neg, i) => (
-                    <div 
-                      key={i} 
-                      onClick={() => setSelectedNegotiation(neg)}
-                      className="flex items-center gap-4 p-5 rounded-2xl hover:bg-gray-50 transition-all cursor-pointer group"
-                    >
-                      <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-all">
-                        {neg.status === 'submitted' ? <AlertCircle size={20} className="text-orange-500" /> : <Clock size={20} />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-[var(--text-main)] mb-1">
-                          <span className="text-[var(--color-primary)]">{neg.evaluatee_name}</span> {neg.position}님이 {statusMap[neg.status]?.label} 상태입니다.
-                        </p>
-                        <p className="text-[11px] text-[var(--text-muted)] font-medium uppercase">
-                          {new Date(neg.updated_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <ChevronRight size={18} className="text-gray-300 group-hover:text-[var(--color-primary)] transition-all" />
+            {/* 우측: AI 인재 리스크 관리 */}
+            <div className="card shadow-xl border-none">
+              <h3 className="text-xl font-black mb-8 flex items-center gap-2">
+                <AlertCircle size={24} className="text-red-500" />
+                AI 인재 리스크 관리 (High)
+              </h3>
+              <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+                {risks.length > 0 ? risks.map((risk) => (
+                  <div key={risk.id} className="p-5 rounded-2xl bg-red-50/30 border border-red-50 flex gap-4 hover:bg-red-50 transition-all cursor-default">
+                    <div className="p-2 h-fit bg-red-100 rounded-xl text-red-600">
+                      <AlertCircle size={20} />
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-black text-sm text-gray-900">{risk.employee_name} <span className="text-xs font-bold text-gray-500 ml-1">({risk.department})</span></p>
+                        <span className="px-2 py-0.5 bg-red-600 text-white text-[10px] font-black rounded-full">RISK</span>
+                      </div>
+                      <p className="text-xs text-red-700 font-medium leading-relaxed">{risk.reason}</p>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="py-20 text-center text-gray-400 font-medium">현재 고위험 대상자가 없습니다.</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 하단 (심층 데이터 영역) */}
+          <div className="card shadow-xl border-none">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+              <div>
+                <h3 className="text-2xl font-black text-[var(--color-primary)]">시장 벤치마크 비교 분석</h3>
+                <p className="text-sm font-bold text-[var(--text-muted)]">업계 평균 대비 자사 보상 수준을 부서별로 확인합니다.</p>
+              </div>
+              <select 
+                className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)] font-bold text-sm"
+                value={selectedDeptFilter}
+                onChange={(e) => setSelectedDeptFilter(e.target.value)}
+              >
+                <option value="전체">전체 부서</option>
+                {departments.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+
+            <div className="relative h-[400px] flex items-end justify-between gap-4 px-4 pt-10 pb-12 border-b border-gray-100">
+              {/* 차트 배경 가로선 */}
+              <div className="absolute inset-0 flex flex-col justify-between py-10 pointer-events-none opacity-5">
+                {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-full border-t border-black"></div>)}
+              </div>
+
+              {benchmarks
+                .filter(b => selectedDeptFilter === '전체' || b.department === selectedDeptFilter)
+                .map((b) => {
+                  const max = Math.max(b.market_avg, b.company_avg) * 1.2;
+                  const marketH = (b.market_avg / max) * 100;
+                  const companyH = (b.company_avg / max) * 100;
+                  return (
+                    <div key={b.id} className="flex-1 flex flex-col items-center group relative h-full">
+                      <div className="flex-1 w-full flex items-end justify-center gap-2 px-2">
+                        {/* 시장 평균 바 */}
+                        <div className="relative group/market w-full max-w-[40px]">
+                          <motion.div 
+                            initial={{ height: 0 }} animate={{ height: `${marketH}%` }} 
+                            className="w-full bg-gray-200 rounded-t-lg group-hover/market:bg-gray-300 transition-colors"
+                          />
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/market:opacity-100 transition-opacity bg-black text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 font-bold">
+                            시장: {(b.market_avg / 10000).toLocaleString()}만
+                          </div>
+                        </div>
+                        {/* 자사 평균 바 */}
+                        <div className="relative group/company w-full max-w-[40px]">
+                          <motion.div 
+                            initial={{ height: 0 }} animate={{ height: `${companyH}%` }} 
+                            className="w-full bg-[var(--color-primary)] rounded-t-lg shadow-lg group-hover/company:bg-[var(--color-secondary)] transition-colors"
+                          />
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/company:opacity-100 transition-opacity bg-[var(--color-primary)] text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 font-bold">
+                            자사: {(b.company_avg / 10000).toLocaleString()}만
+                          </div>
+                        </div>
+                      </div>
+                      <p className="mt-4 text-xs font-black text-gray-700 truncate w-full text-center">{b.department}</p>
+                    </div>
+                  );
+                })}
+            </div>
+            
+            <div className="flex justify-center gap-6 mt-6">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-gray-200 rounded-sm"></div>
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Market Avg</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-[var(--color-primary)] rounded-sm"></div>
+                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Our Company</span>
               </div>
             </div>
           </div>
@@ -426,114 +480,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </table>
           </div>
         </motion.div>
-      )}
-
-      {currentTab === 'employees' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
-            <div className="card shadow-xl sticky top-24">
-              <h3 className="text-xl font-black mb-6 flex items-center gap-2">
-                <UserPlus size={24} className="text-[var(--color-primary)]" />
-                신규 사원 등록
-              </h3>
-              <form onSubmit={handleAddEmployee} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold mb-1.5">사번</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    placeholder="예: 20240101"
-                    value={newEmployee.id}
-                    onChange={(e) => setNewEmployee({...newEmployee, id: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1.5">이름</label>
-                  <input 
-                    type="text" 
-                    required 
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    placeholder="성함 입력"
-                    value={newEmployee.name}
-                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1.5">부서</label>
-                  <select 
-                    required 
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    value={newEmployee.dept}
-                    onChange={(e) => setNewEmployee({...newEmployee, dept: e.target.value})}
-                  >
-                    <option value="">부서 선택</option>
-                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold mb-1.5">직급</label>
-                  <select 
-                    required 
-                    className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    value={newEmployee.pos}
-                    onChange={(e) => setNewEmployee({...newEmployee, pos: e.target.value})}
-                  >
-                    <option value="">직급 선택</option>
-                    {positions.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={empLoading}
-                  className="btn btn-primary w-full justify-center py-4 mt-2"
-                >
-                  {empLoading ? '처리 중...' : '사원 등록하기'}
-                </button>
-              </form>
-            </div>
-          </div>
-
-          <div className="lg:col-span-2">
-            <div className="card shadow-xl p-0 overflow-hidden">
-              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-white">
-                <h3 className="text-xl font-black">사원 마스터 데이터</h3>
-                <span className="text-sm font-bold text-[var(--text-muted)]">전체 {employees.length}명</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">사번</th>
-                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">이름</th>
-                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">부서</th>
-                      <th className="px-6 py-4 text-left text-xs font-black text-gray-500 uppercase tracking-wider">직급</th>
-                      <th className="px-6 py-4 text-right text-xs font-black text-gray-500 uppercase tracking-wider">관리</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {employees.map((emp) => (
-                      <tr key={emp.employee_id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.employee_id}</td>
-                        <td className="px-6 py-4 text-sm font-black text-gray-900">{emp.full_name}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.department}</td>
-                        <td className="px-6 py-4 text-sm font-bold text-gray-600">{emp.position}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => handleDeleteEmployee(emp.employee_id)}
-                            className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          >
-                            <X size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
