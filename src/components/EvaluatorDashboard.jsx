@@ -298,12 +298,37 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
         const result = JSON.parse(jsonMatch[0]);
 
         if (result.market_avg) {
-          const { error } = await supabase
+          // 실시간 자사 평균가 계산
+          const deptProfiles = allProfiles.filter(p => p.department === dept);
+          const companyAvg = deptProfiles.length > 0 
+            ? Math.round(deptProfiles.reduce((acc, p) => acc + (p.current_salary || 0), 0) / deptProfiles.length)
+            : 0;
+
+          // 부서별 데이터 존재 여부 확인
+          const { data: existing } = await supabase
             .from('market_benchmarks')
-            .update({ market_avg: result.market_avg, updated_at: new Date() })
-            .eq('department', dept);
-          
-          if (error) console.error(`${dept} 업데이트 오류:`, error);
+            .select('id')
+            .eq('department', dept)
+            .single();
+
+          if (existing) {
+            await supabase
+              .from('market_benchmarks')
+              .update({ 
+                market_avg: result.market_avg, 
+                company_avg: companyAvg,
+                updated_at: new Date() 
+              })
+              .eq('id', existing.id);
+          } else {
+            await supabase
+              .from('market_benchmarks')
+              .insert({ 
+                department: dept,
+                market_avg: result.market_avg, 
+                company_avg: companyAvg
+              });
+          }
         }
       }
       alert('시장가가 최신 정보로 업데이트되었습니다.');
@@ -638,9 +663,22 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   .map((b) => {
                     const max = Math.max(b.market_avg, b.company_avg, 1) * 1.2;
                     return (
-                      <div key={b.id} className="flex-1 flex items-end gap-1 group relative h-full max-w-[30px]">
-                        <div className="flex-1 bg-gray-100 rounded-t-sm" style={{ height: `${(b.market_avg / max) * 100}%` }}></div>
-                        <div className="flex-1 bg-[var(--color-primary)] rounded-t-sm" style={{ height: `${(b.company_avg / max) * 100}%` }}></div>
+                      <div key={b.id} className="flex-1 flex flex-col items-center gap-2 h-full min-w-0 group relative">
+                        <div className="flex-1 w-full flex items-end justify-center gap-1 min-h-0">
+                          <div 
+                            className="w-full max-w-[12px] bg-gray-100 rounded-t-sm transition-all duration-500 hover:bg-gray-200" 
+                            style={{ height: `${(b.market_avg / max) * 100}%` }}
+                            title={`시장 평균: ${(b.market_avg / 10000).toLocaleString()}만원`}
+                          ></div>
+                          <div 
+                            className="w-full max-w-[12px] bg-[var(--color-primary)] rounded-t-sm transition-all duration-500 hover:opacity-80" 
+                            style={{ height: `${(b.company_avg / max) * 100}%` }}
+                            title={`자사 평균: ${(b.company_avg / 10000).toLocaleString()}만원`}
+                          ></div>
+                        </div>
+                        <span className="text-[7px] font-black text-gray-400 truncate w-full text-center">
+                          {b.department.replace('팀', '')}
+                        </span>
                       </div>
                     );
                   })}
