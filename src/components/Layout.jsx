@@ -9,7 +9,8 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  TrendingUp
+  TrendingUp,
+  RefreshCw
 } from 'lucide-react';
 
 const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
