@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '../supabaseClient';
 import { 
   LayoutDashboard, 
   FileText, 
@@ -26,7 +27,7 @@ const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
   </div>
 );
 
-const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
+const Layout = ({ children, userRole, currentTab, setCurrentTab, session }) => {
   const [collapsed, setCollapsed] = useState(false);
 
   const menuItems = [
@@ -83,7 +84,12 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
             <RefreshCw size={20} />
             {!collapsed && <span className="text-sm font-medium">평가자 모드로 전환</span>}
           </button>
-          <SidebarItem icon={LogOut} label="로그아웃" collapsed={collapsed} />
+          <SidebarItem 
+            icon={LogOut} 
+            label="로그아웃" 
+            collapsed={collapsed} 
+            onClick={() => supabase.auth.signOut()}
+          />
         </div>
       </aside>
 
@@ -106,15 +112,20 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab }) => {
               
               <div className="flex items-center gap-3 pl-4 border-l border-[var(--border-color)]">
                 <div className="text-right hidden sm:block">
-                  <p className="text-sm font-bold text-[var(--text-main)]">홍길동</p>
-                  <p className="text-[10px] text-[var(--text-muted)] font-medium">인사팀 팀장</p>
+                  <p className="text-sm font-bold text-[var(--text-main)] truncate max-w-[150px]">
+                    {session?.user?.email?.split('@')[0]}
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-medium">{userRole === 'evaluator' ? '평가자' : '피평가자'}</p>
                 </div>
                 <div className="w-10 h-10 bg-[var(--color-secondary)] rounded-full flex items-center justify-center text-white font-bold overflow-hidden">
                   <User size={20} />
                 </div>
               </div>
 
-              <button className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2">
+              <button 
+                onClick={() => supabase.auth.signOut()}
+                className="flex items-center gap-2 px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-2"
+              >
                 <LogOut size={18} />
                 <span>로그아웃</span>
               </button>

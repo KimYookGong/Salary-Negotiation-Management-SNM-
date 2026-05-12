@@ -1,15 +1,28 @@
-import React, { useState } from 'react';
-import Layout from './components/Layout';
-import EvaluateeDashboard from './components/EvaluateeDashboard';
-import EvaluatorDashboard from './components/EvaluatorDashboard';
+import { supabase } from './supabaseClient';
+import Auth from './components/Auth';
 
 function App() {
-  // Simple role and tab management for demo purposes
-  // In a real app, this would come from Supabase Auth
+  const [session, setSession] = useState(null);
   const [userRole, setUserRole] = useState('evaluator'); // 'evaluatee' or 'evaluator'
   const [currentTab, setCurrentTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
 
-  // Handle custom actions from sidebar in useEffect to avoid infinite re-renders
+  React.useEffect(() => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setLoading(false);
+    });
+
+    // Listen for changes on auth state (logged in, signed out, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle custom actions from sidebar
   React.useEffect(() => {
     if (currentTab === 'switch-role') {
       setUserRole(prev => prev === 'evaluator' ? 'evaluatee' : 'evaluator');
@@ -29,12 +42,25 @@ function App() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
+        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <Auth />;
+  }
+
   return (
     <div className="app-container">
       <Layout 
         userRole={userRole} 
         currentTab={currentTab} 
         setCurrentTab={setCurrentTab}
+        session={session}
       >
         {renderContent()}
       </Layout>
