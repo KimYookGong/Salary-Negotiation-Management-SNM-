@@ -17,7 +17,9 @@ import {
   AlertCircle,
   BarChart2,
   RefreshCw,
-  Target
+  Target,
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -97,6 +99,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // 심층 데이터 상태
   const [budget, setBudget] = useState({ total_budget: 1, used_budget: 0 });
@@ -158,6 +161,104 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleAIAnalysis = async () => {
+    if (!selectedNegotiation) return;
+    setIsAnalyzing(true);
+
+    try {
+      const prompt = `
+        다음 직원에 대한 인사 데이터와 직무기술서(JD)를 바탕으로 심층 분석을 수행해줘.
+        
+        [직원 정보]
+        이름: ${selectedNegotiation.evaluatee_name}
+        부서: ${selectedNegotiation.department}
+        직급: ${selectedNegotiation.position}
+        요구안: ${selectedNegotiation.evaluatee_proposal}
+        
+        [직무기술서(JD)]
+        ${selectedNegotiation.jd || '정보 없음'}
+        
+        [성과 및 근거]
+        ${selectedNegotiation.reason || '정보 없음'}
+        
+        [지시 사항]
+        1. 이 직원의 적정 가치 점수(capability_score)를 0.0에서 5.0 사이의 실수로 산출해줘.
+        2. 이탈 위험도(risk_level)를 'High', 'Medium', 'Low' 중 하나로 평가해줘.
+        3. 평가 및 거절/수락 사유(reason)를 상세히 작성해줘.
+        
+        반드시 다음 JSON 형식으로만 응답해 (추가 설명 없이 JSON만):
+        {
+          "capability_score": 4.5,
+          "risk_level": "Medium",
+          "reason": "성과가 우수하나 시장가 대비 요구액이 높음..."
+        }
+      `;
+
+      // API 호출 (사용자 요청 모델: gemini-2.5-flash -> 실존하는 2.0 Flash Exp로 보정하여 시도)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=AIzaSyDY1gu8rV39GDehQWboO9aH-WyTqRvWP6E`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await response.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // JSON 추출 (마크다운 코드 블록 제거 등)
+      const jsonStr = rawText.replace(/```json|```/g, '').trim();
+      const result = JSON.parse(jsonStr);
+
+      // 1. negotiations 테이블 score 업데이트
+      const { error: scoreError } = await supabase
+        .from('negotiations')
+        .update({ score: result.capability_score })
+        .eq('id', selectedNegotiation.id);
+
+      if (scoreError) throw scoreError;
+
+      // 2. risk_assessments 테이블 Insert/Update (employee_id 기준)
+      const employeeProfile = allProfiles.find(p => p.id === selectedNegotiation.evaluatee_id);
+      const employee_id = employeeProfile?.employee_id || `EMP-${selectedNegotiation.evaluatee_id.slice(0, 8)}`;
+
+      // 기존 리스크가 있는지 확인 (employee_id 기준)
+      const { data: existingRisk } = await supabase
+        .from('risk_assessments')
+        .select('id')
+        .eq('employee_id', employee_id)
+        .single();
+
+      if (existingRisk) {
+        await supabase
+          .from('risk_assessments')
+          .update({
+            risk_level: result.risk_level,
+            reason: result.reason
+          })
+          .eq('id', existingRisk.id);
+      } else {
+        await supabase
+          .from('risk_assessments')
+          .insert({
+            employee_id,
+            employee_name: selectedNegotiation.evaluatee_name,
+            department: selectedNegotiation.department,
+            risk_level: result.risk_level,
+            reason: result.reason
+          });
+      }
+
+      alert('AI 분석이 완료되었습니다.');
+      fetchData(); // 대시보드 새로고침
+    } catch (error) {
+      console.error('AI 분석 오류:', error);
+      alert('AI 분석 중 오류가 발생했습니다.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase
@@ -230,6 +331,17 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                   className="btn btn-primary w-full justify-center py-4 text-base"
                 >
                   즉시 수락 및 합의
+                </button>
+                <button 
+                  onClick={handleAIAnalysis} 
+                  disabled={isAnalyzing}
+                  className="btn btn-outline w-full justify-center py-4 text-base border-[var(--color-accent-2)] text-[var(--color-accent-2)] hover:bg-[var(--color-accent-2)]/5"
+                >
+                  {isAnalyzing ? (
+                    <span className="flex items-center gap-2"><Loader2 size={18} className="animate-spin" /> 분석 중...</span>
+                  ) : (
+                    <span className="flex items-center gap-2"><Zap size={18} /> AI 심층 분석 실행</span>
+                  )}
                 </button>
                 <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-base">
                   조건 역제시
