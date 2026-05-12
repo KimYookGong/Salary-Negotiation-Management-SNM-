@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. 예산 테이블
+-- 4. 예산 테이블 (회사 전체)
 CREATE TABLE IF NOT EXISTS budgets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   year INTEGER NOT NULL,
@@ -69,6 +69,21 @@ CREATE TABLE IF NOT EXISTS budgets (
   used_budget BIGINT DEFAULT 0,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 5. 부서별 예산 테이블
+CREATE TABLE IF NOT EXISTS department_budgets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department_name department_type NOT NULL UNIQUE,
+  total_budget BIGINT NOT NULL,
+  used_budget BIGINT DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- RLS 정책 추가
+ALTER TABLE department_budgets ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow all actions for now" ON department_budgets;
+CREATE POLICY "Allow all actions for now" ON department_budgets FOR ALL USING (true);
+
 
 -- RLS 설정 및 정책 초기화
 ALTER TABLE negotiations ENABLE ROW LEVEL SECURITY;
@@ -96,3 +111,21 @@ DROP POLICY IF EXISTS "Users can see their own notifications" ON notifications;
 CREATE POLICY "Users can see their own notifications" ON notifications FOR SELECT USING (auth.uid() = user_id);
 DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
 CREATE POLICY "Users can update their own notifications" ON notifications FOR UPDATE USING (auth.uid() = user_id);
+
+-- 6. 예산 업데이트용 RPC 함수
+CREATE OR REPLACE FUNCTION increment_budget(amount BIGINT, dept department_type)
+RETURNS VOID AS $$
+BEGIN
+  -- 전체 예산 업데이트 (2026년 기준)
+  UPDATE budgets
+  SET used_budget = used_budget + amount,
+      updated_at = NOW()
+  WHERE year = 2026;
+
+  -- 부서 예산 업데이트
+  UPDATE department_budgets
+  SET used_budget = used_budget + amount,
+      updated_at = NOW()
+  WHERE department_name = dept;
+END;
+$$ LANGUAGE plpgsql;
