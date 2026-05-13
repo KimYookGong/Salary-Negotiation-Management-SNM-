@@ -30,10 +30,22 @@ const statusMap = {
   rejected: { label: '거절됨', className: 'bg-red-100 text-red-700' },
 };
 
+// 금액 포맷터
+const formatCurrency = (value) => {
+  if (!value && value !== 0) return '-';
+  const num = Number(value);
+  if (num >= 100000000) {
+    return (num / 100000000).toFixed(1) + '억';
+  }
+  return (num / 10000).toLocaleString() + '만원';
+};
+
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (percentage / 100) * circumference;
+  // 100%에서 사용률만큼 차감된 잔여량을 표시
+  const remainingPercentage = Math.max(0, 100 - percentage);
+  const offset = circumference - (remainingPercentage / 100) * circumference;
 
   return (
     <div className="relative flex flex-col items-center">
@@ -179,7 +191,7 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
               </div>
               <div className="flex justify-between">
                 <span className="text-sm font-bold text-gray-400">현재 연봉</span>
-                <span className="text-sm font-black text-gray-900">{(employee.current_salary / 10000).toLocaleString()}만원</span>
+                <span className="text-sm font-black text-gray-900">{formatCurrency(employee.current_salary)}</span>
               </div>
             </div>
 
@@ -326,7 +338,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTab]);
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase.from('negotiations').update({ status, updated_at: new Date(), ...extra }).eq('id', id);
@@ -348,7 +360,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       position: selectedEmployeeForSalary.position,
       current_salary: selectedEmployeeForSalary.current_salary,
       performance_rating: rating,
-      evaluator_proposal: `${(Number(salary)/10000).toLocaleString()}만원`,
+      evaluator_proposal: formatCurrency(salary),
       status: 'counter_offer',
       updated_at: new Date()
     };
@@ -383,7 +395,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   });
 
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
-  const departments = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
+  const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
 
   // Current Budget View based on filter
   const currentBudgetContext = dbDeptFilter === '전체' 
@@ -400,11 +412,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       {currentTab === 'dashboard' && (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           {/* Dashboard Header with Filter */}
-          <div className="flex items-center justify-between shrink-0 px-2">
-            <div>
-              <h3 className="text-xl font-black text-gray-900">조직 예산 및 인원 현황</h3>
-              <p className="text-xs text-gray-400 font-bold">선택한 부서의 실시간 예산 사용률과 사원 정보를 확인합니다.</p>
-            </div>
+          <div className="flex items-center justify-end shrink-0 px-2">
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
               <Filter size={16} className="text-gray-400" />
               <span className="text-xs font-black text-gray-400 uppercase tracking-tighter mr-2">부서 필터</span>
@@ -420,47 +428,32 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           </div>
 
           {/* Budget Widget Row */}
-          <div className="grid grid-cols-12 gap-6 shrink-0">
-            <div className="col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-8">
-                <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">총 인상 예산 (한도)</h4>
-                    <p className="text-2xl font-black text-gray-900">{(currentBudgetContext.limit / 10000).toLocaleString()}만원</p>
-                  </div>
-                  <div>
-                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">현재 예산 사용액</h4>
-                    <p className="text-2xl font-black text-[var(--color-primary)]">{(currentBudgetContext.used / 10000).toLocaleString()}만원</p>
+          <div className="grid grid-cols-1 gap-6 shrink-0">
+            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
+              <h3 className="text-lg font-black text-gray-900 mb-6 px-2">예산 현황</h3>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-12">
+                  <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">총 인상 예산 (한도)</h4>
+                      <p className="text-3xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit)}</p>
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">현재 예산 사용액</h4>
+                      <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrency(currentBudgetContext.used)}</p>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="h-20 w-[1px] bg-gray-100 mx-8 hidden lg:block" />
-              <div className="flex-1 grid grid-cols-2 gap-6">
-                <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <Wallet size={16} />
-                    <span className="text-[10px] font-black uppercase">가용 예산</span>
+                
+                <div className="h-24 w-[1px] bg-gray-100 mx-8 hidden lg:block" />
+                
+                <div className="flex-1 flex flex-col justify-center">
+                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 text-center max-w-xs ml-auto">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">잔여 가용 예산</p>
+                    <p className="text-2xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit - currentBudgetContext.used)}</p>
                   </div>
-                  <p className="text-lg font-black text-gray-900">{((currentBudgetContext.limit - currentBudgetContext.used) / 10000).toLocaleString()}만원</p>
                 </div>
-                <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100">
-                  <div className="flex items-center gap-2 text-gray-400 mb-2">
-                    <ArrowUpRight size={16} />
-                    <span className="text-[10px] font-black uppercase">평균 인상률</span>
-                  </div>
-                  <p className="text-lg font-black text-gray-900">4.2%</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="col-span-4 bg-[var(--color-primary)] p-8 rounded-3xl shadow-sm border border-white/10 flex flex-col justify-center text-white relative overflow-hidden group">
-              <div className="relative z-10">
-                <h3 className="text-xl font-black mb-2">스마트 예산 통제</h3>
-                <p className="text-white/60 text-sm leading-relaxed font-medium">부서별 할당 예산을 초과하는 제안은 시스템에서 자동으로 차단됩니다.</p>
-              </div>
-              <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform duration-500">
-                <ShieldAlert size={140} />
               </div>
             </div>
           </div>
@@ -493,8 +486,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                     <tr key={emp.employee_id} className="hover:bg-gray-50/50 cursor-pointer" onClick={() => { setSelectedEmployeeForSalary(emp); setIsSalaryPopupOpen(true); }}>
                       <td className="px-8 py-5"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center"><User size={20} /></div><p className="text-sm font-black text-gray-900">{emp.full_name}</p></div></td>
                       <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.department}</td>
-                      <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.position}</td>
-                      <td className="px-8 py-5 text-right text-sm font-black text-gray-900">{(emp.current_salary / 10000).toLocaleString()}만원</td>
+                       <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.position}</td>
+                      <td className="px-8 py-5 text-right text-sm font-black text-gray-900">{formatCurrency(emp.current_salary)}</td>
                       <td className="px-8 py-5 text-center">
                         <span className={`inline-block px-3 py-1 rounded-lg text-xs font-black border ${
                           emp.performance_rating === 'S' ? 'bg-purple-50 text-purple-600 border-purple-100' :

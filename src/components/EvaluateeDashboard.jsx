@@ -24,6 +24,16 @@ const StatusBadge = ({ status }) => {
   );
 };
 
+// 금액 포맷터
+const formatCurrency = (value) => {
+  if (!value && value !== 0) return '-';
+  const num = Number(value);
+  if (num >= 100000000) {
+    return (num / 100000000).toFixed(1) + '억';
+  }
+  return (num / 10000).toLocaleString() + '만원';
+};
+
 const EvaluateeDashboard = ({ profile }) => {
   const [negotiation, setNegotiation] = useState(null);
   const [loading, setLoading] = useState(true);
