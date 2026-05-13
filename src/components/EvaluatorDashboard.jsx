@@ -41,6 +41,14 @@ const formatCurrency = (value) => {
   return (num / 10000).toLocaleString() + '만원';
 };
 
+// 단순 만원 포맷터 (예산 현황용)
+const formatCurrencySimple = (value) => {
+  if (!value && value !== 0) return '0원';
+  const num = Number(value);
+  return (num / 10000).toLocaleString() + '만원';
+};
+
+
 // 근속연수 계산기
 const calculateTenure = (hireDate) => {
   if (!hireDate) return '-';
@@ -401,8 +409,9 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
   const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
 
+  const totalDeptsUsed = budgets.depts.reduce((sum, d) => sum + (d.used_budget || 0), 0);
   const currentBudgetContext = dbDeptFilter === '전체' 
-    ? { limit: budgets.company?.total_budget || 1, used: budgets.company?.used_budget || 0, label: '회사 전체' }
+    ? { limit: budgets.company?.total_budget || 1, used: totalDeptsUsed, label: '회사 전체' }
     : { 
         limit: budgets.depts.find(d => d.department_name === dbDeptFilter)?.total_budget || 1, 
         used: budgets.depts.find(d => d.department_name === dbDeptFilter)?.used_budget || 0, 
@@ -435,19 +444,22 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </div>
           </div>
 
-          <div className="flex shrink-0">
+          <div className="flex flex-col gap-3 shrink-0">
+            <h3 className="text-xl font-black text-[var(--color-primary)] px-2 flex items-center gap-2">
+              <Wallet size={20} /> 예산 현황
+            </h3>
             <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-8">
               <div className="flex items-center gap-6">
                 <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
                 <div className="flex items-center gap-8">
                   <div>
                     <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">총 인상 예산</p>
-                    <p className="text-xl font-black text-gray-900 leading-tight">{formatCurrency(currentBudgetContext.limit)}</p>
+                    <p className="text-xl font-black text-gray-900 leading-tight">{formatCurrencySimple(currentBudgetContext.limit)}</p>
                   </div>
                   <div className="w-[1px] h-6 bg-gray-100" />
                   <div>
                     <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">현재 사용액</p>
-                    <p className="text-xl font-black text-[var(--color-primary)] leading-tight">{formatCurrency(currentBudgetContext.used)}</p>
+                    <p className="text-xl font-black text-[var(--color-primary)] leading-tight">{formatCurrencySimple(currentBudgetContext.used)}</p>
                   </div>
                 </div>
               </div>
@@ -455,12 +467,12 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           </div>
 
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-gray-50/30">
-              <h3 className="text-2xl font-black text-[var(--color-primary)] mb-1 flex items-center gap-2"><Users size={24} /> 사원 현황</h3>
+            <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 bg-gray-50/30">
+              <h3 className="text-lg font-black text-[var(--color-primary)] flex items-center gap-2"><Users size={20} /> 사원 현황</h3>
               <div className="flex items-center gap-4">
                 <div className="relative group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
-                  <input type="text" placeholder="성명 검색..." className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none w-64 text-sm font-medium shadow-sm" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
+                  <input type="text" placeholder="성명 검색..." className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl outline-none w-56 text-xs font-medium shadow-sm" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
                 </div>
               </div>
             </div>
