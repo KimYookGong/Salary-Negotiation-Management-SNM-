@@ -1,20 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://hxilyzgcsseejsiwilfs.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_2G3QISSIIR8qdfnbfP4UQA_XCtx0SVv';
 
-// 디버깅을 위한 환경 변수 상태 로깅 (실제 키 전체를 노출하지 않도록 주의)
+// 디버깅을 위한 환경 변수 상태 로깅
 console.log('Supabase URL:', supabaseUrl);
 console.log('Supabase Key initialized:', !!supabaseAnonKey);
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('CRITICAL: Supabase credentials are missing! Check your .env file or Environment Variables.');
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn('NOTE: Using fallback Supabase credentials. Make sure .env is correctly loaded.');
 }
 
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co', 
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // 연결 테스트 함수 추가
 export const testSupabaseConnection = async () => {
