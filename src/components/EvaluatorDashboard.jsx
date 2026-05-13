@@ -26,7 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const statusMap = {
   submitted: { label: '대기중', className: 'bg-orange-100 text-orange-700' },
   under_review: { label: '검토중', className: 'bg-blue-100 text-blue-700' },
-  counter_offer: { label: '역제시중', className: 'bg-purple-100 text-purple-700' },
+  counter_offer: { label: '제시중', className: 'bg-purple-100 text-purple-700' }, // '역제시중' -> '제시중'
   final_agreement: { label: '수락됨', className: 'bg-green-100 text-green-700' },
   rejected: { label: '거절됨', className: 'bg-red-100 text-red-700' },
 };
@@ -44,16 +44,16 @@ const formatCurrency = (value) => {
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
   const radius = 35;
   const circumference = 2 * Math.PI * radius;
-  // 100%에서 사용률만큼 차감된 잔여량을 표시
+  // 잔여량을 표시하도록 변경
   const remainingPercentage = Math.max(0, 100 - percentage);
   const offset = circumference - (remainingPercentage / 100) * circumference;
 
   return (
     <div className="relative flex flex-col items-center">
-      <svg className="w-32 h-32 transform -rotate-90">
-        <circle cx="64" cy="64" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="8" fill="transparent" />
+      <svg className="w-24 h-24 transform -rotate-90">
+        <circle cx="48" cy="48" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="8" fill="transparent" />
         <circle 
-          cx="64" cy="64" r={radius} stroke={color} strokeWidth="8" fill="transparent"
+          cx="48" cy="48" r={radius} stroke={color} strokeWidth="8" fill="transparent"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
@@ -61,8 +61,8 @@ const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
         />
       </svg>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-        <span className="text-xl font-black text-gray-900">{Math.round(percentage)}%</span>
-        <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
+        <span className="text-lg font-black text-gray-900">{Math.round(remainingPercentage)}%</span>
+        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
       </div>
     </div>
   );
@@ -87,8 +87,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
       >
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h3 className="text-2xl font-black text-gray-900 mb-1">조건 역제시</h3>
-            <p className="text-sm text-gray-400 font-bold">{name}님의 요구안에 대한 역제시안을 작성합니다.</p>
+            <h3 className="text-2xl font-black text-gray-900 mb-1">조건 제시</h3>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
             <X size={24} className="text-gray-400" />
@@ -97,23 +96,20 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
 
         <div className="space-y-6">
           <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">현재 요구안</p>
             <p className="text-lg font-black text-gray-900">{currentProposal}</p>
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">역제시 연봉/조건</label>
             <input 
               type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
-              placeholder="예: 7,200만원" value={offer} onChange={(e) => setOffer(e.target.value)}
+              placeholder="제시 연봉 (예: 7,200만원)" value={offer} onChange={(e) => setOffer(e.target.value)}
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">검토 의견</label>
             <textarea 
               className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 h-32 text-sm font-medium"
-              placeholder="역제시 사유 및 추가 검토 의견을 입력하세요."
+              placeholder="검토 의견을 입력하세요."
               value={comment} onChange={(e) => setComment(e.target.value)}
             />
           </div>
@@ -125,7 +121,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
             onClick={() => onConfirm(offer, comment)}
             className="flex-2 py-4 px-8 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
-            역제시안 전송
+            제시안 전송
           </button>
         </div>
       </motion.div>
@@ -171,7 +167,6 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
         <div className="flex justify-between items-start mb-8">
           <div>
             <h3 className="text-3xl font-black text-gray-900 mb-1">연봉 협상 제안</h3>
-            <p className="text-sm text-gray-400 font-bold">대상자 인사 정보를 기반으로 협상을 시작합니다.</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
             <X size={24} className="text-gray-400" />
@@ -180,7 +175,6 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
 
         <div className="grid grid-cols-2 gap-10">
           <div className="space-y-6">
-            <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest border-b pb-2">기본 정보</h4>
             <div className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-sm font-bold text-gray-400">성명</span>
@@ -198,7 +192,6 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
 
             {/* Budget Impact Alert */}
             <div className="mt-8 p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
-              <h5 className="text-[10px] font-black text-gray-400 uppercase">예산 영향도 분석</h5>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-gray-500">전체 예산 사용률</span>
@@ -218,17 +211,15 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
               { (totalUsage > 100 || deptUsage > 100) && (
                 <div className="flex items-center gap-2 text-red-600 mt-3 pt-3 border-t border-red-100">
                   <ShieldAlert size={14} />
-                  <span className="text-[10px] font-black">예산 한도를 초과했습니다. 제안을 재검토하세요.</span>
+                  <span className="text-[10px] font-black">예산 한도를 초과했습니다.</span>
                 </div>
               )}
             </div>
           </div>
 
           <div className="space-y-6">
-            <h4 className="text-[11px] font-black text-[var(--color-primary)] uppercase tracking-widest border-b border-[var(--color-primary)]/20 pb-2">협상 제안서 작성</h4>
             <div className="space-y-5">
               <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">현 제안 등급</label>
                 <div className="flex gap-2">
                   {['S', 'A', 'B', 'C', 'D'].map(r => (
                     <button 
@@ -243,10 +234,9 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
                 </div>
               </div>
               <div>
-                <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">제안 연봉 (원)</label>
                 <input 
                   type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
-                  placeholder="예: 75000000" value={proposedSalary} onChange={(e) => setProposedSalary(e.target.value)}
+                  placeholder="제안 연봉" value={proposedSalary} onChange={(e) => setProposedSalary(e.target.value)}
                 />
               </div>
               <div className="p-4 bg-[var(--color-primary)]/5 rounded-2xl border border-[var(--color-primary)]/10 flex items-center justify-between">
@@ -262,7 +252,6 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
           <button 
             disabled={totalUsage > 100 || deptUsage > 100}
             onClick={() => {
-              alert(`전체 예산의 ${totalUsage}%, ${employee.department} 예산의 ${deptUsage}%를 사용합니다.`);
               onConfirm(proposedRating, proposedSalary, increaseRate);
             }}
             className={`flex-2 py-4 px-8 text-white text-base font-black rounded-2xl shadow-xl transition-all ${
@@ -296,50 +285,28 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      console.log('Starting fetchData in EvaluatorDashboard...');
-      
       const { data: negs, error: negsError } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
-      if (negsError) {
-        console.error('Negotiations fetch error:', negsError);
-        throw negsError;
-      }
-      console.log('Negotiations fetched:', negs?.length || 0);
+      if (negsError) throw negsError;
       if (negs) setNegotiations(negs);
 
       const { data: emps, error: empsError } = await supabase.from('employees').select('*');
-      if (empsError) {
-        console.error('Employees fetch error:', empsError);
-        throw empsError;
-      }
-      console.log('Employees fetched:', emps?.length || 0);
+      if (empsError) throw empsError;
       if (emps) setEmployees(emps);
 
       const { data: companyBudget, error: budgetError } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
-      if (budgetError && budgetError.code !== 'PGRST116') {
-        console.error('Budget fetch error:', budgetError);
-      }
-      
       const { data: deptBudgets, error: deptError } = await supabase.from('department_budgets').select('*');
-      if (deptError) {
-        console.error('Dept budgets fetch error:', deptError);
-      }
       
-      // 더미 데이터 초기화 (데이터가 없을 경우)
       if (!companyBudget && (!budgetError || budgetError.code === 'PGRST116')) {
-        console.log('No company budget found, attempting to initialize...');
-        const { data: newBudget, error: insError } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
-        if (insError) console.error('Budget initialization failed:', insError);
+        const { data: newBudget } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
         if (newBudget) setBudgets(prev => ({ ...prev, company: newBudget }));
       } else {
         setBudgets(prev => ({ ...prev, company: companyBudget }));
       }
 
       if (!deptBudgets || deptBudgets.length === 0) {
-        console.log('No department budgets found, attempting to initialize...');
         const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
         const dummyDepts = depts.map(d => ({ department_name: d, total_budget: 200000000, used_budget: 0 }));
-        const { data: newDepts, error: upsertError } = await supabase.from('department_budgets').upsert(dummyDepts).select();
-        if (upsertError) console.error('Dept budget initialization failed:', upsertError);
+        const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
         setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
       } else {
         setBudgets(prev => ({ ...prev, depts: deptBudgets }));
@@ -347,7 +314,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
 
     } catch (error) {
       console.error('CRITICAL: Error fetching data in EvaluatorDashboard:', error);
-      alert(`데이터를 불러오는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     } finally {
       setLoading(false);
     }
@@ -367,7 +333,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     if (!selectedEmployeeForSalary) return;
     const additionalCost = Number(salary.replace(/[^0-9]/g, '')) - Number(selectedEmployeeForSalary.current_salary);
     
-    // 예산 업데이트 로직 포함
     await supabase.rpc('increment_budget', { amount: additionalCost, dept: selectedEmployeeForSalary.department });
     
     const { data: userProfile } = await supabase.from('profiles').select('id').eq('employee_id', selectedEmployeeForSalary.employee_id).single();
@@ -414,7 +379,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
   const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
 
-  // Current Budget View based on filter
   const currentBudgetContext = dbDeptFilter === '전체' 
     ? { limit: budgets.company?.total_budget || 1, used: budgets.company?.used_budget || 0, label: '회사 전체' }
     : { 
@@ -428,7 +392,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-          {/* Dashboard Header with Filter */}
           <div className="flex items-center justify-between shrink-0 px-2">
             <button 
               onClick={() => fetchData()} 
@@ -439,7 +402,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </button>
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
               <Filter size={16} className="text-gray-400" />
-              <span className="text-xs font-black text-gray-400 uppercase tracking-tighter mr-2">부서 필터</span>
               <select 
                 className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
                 value={dbDeptFilter} 
@@ -451,38 +413,21 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </div>
           </div>
 
-          {/* Budget Widget Row */}
           <div className="grid grid-cols-1 gap-6 shrink-0">
-            <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100">
-              <h3 className="text-lg font-black text-gray-900 mb-6 px-2">예산 현황</h3>
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-12">
                   <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
-                  <div className="space-y-6">
-                    <div>
-                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">총 인상 예산 (한도)</h4>
-                      <p className="text-3xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit)}</p>
-                    </div>
-                    <div>
-                      <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-1">현재 예산 사용액</h4>
-                      <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrency(currentBudgetContext.used)}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="h-24 w-[1px] bg-gray-100 mx-8 hidden lg:block" />
-                
-                <div className="flex-1 flex flex-col justify-center">
-                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100 text-center max-w-xs ml-auto">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">잔여 가용 예산</p>
-                    <p className="text-2xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit - currentBudgetContext.used)}</p>
+                  <div className="flex items-center gap-12">
+                    <p className="text-3xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit)}</p>
+                    <div className="w-[1px] h-8 bg-gray-100" />
+                    <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrency(currentBudgetContext.used)}</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Main Table Area */}
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="p-8 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0 bg-gray-50/30">
               <h3 className="text-2xl font-black text-[var(--color-primary)] mb-1 flex items-center gap-2"><Users size={24} /> 사원 현황</h3>
@@ -535,7 +480,6 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
             <div>
               <h3 className="text-xl font-black text-[var(--color-primary)] mb-1">협상 프로세스 관리</h3>
-              <p className="text-xs text-gray-400 font-bold">전체 {filteredNegotiations.length}명의 데이터 관리 중</p>
             </div>
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
@@ -571,7 +515,7 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-50 overflow-y-auto">
               <div className="p-10">
                 <div className="flex justify-between items-start mb-10"><div className="flex items-center gap-5"><div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300"><User size={32} /></div><div><h2 className="text-3xl font-black text-gray-900">{selectedNegotiation.evaluatee_name}</h2><div className="flex items-center gap-2 mt-1"><p className="text-sm font-bold text-gray-500">{selectedNegotiation.department} {selectedNegotiation.position}</p>{selectedNegotiation.performance_rating && <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-0.5 rounded-md">{selectedNegotiation.performance_rating}등급</span>}</div></div></div><button onClick={() => setSelectedNegotiation(null)} className="p-2 hover:bg-gray-50 rounded-xl"><X size={24} className="text-gray-400" /></button></div>
-                <div className="space-y-10"><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section><div className="grid grid-cols-2 gap-4 pt-6"><button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4">즉시 수락 및 합의</button><button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4">조건 역제시</button></div></div>
+                <div className="space-y-10"><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section><div className="grid grid-cols-2 gap-4 pt-6"><button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4">즉시 수락 및 합의</button><button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4">조건 제시</button></div></div>
               </div>
             </motion.div>
           </>
