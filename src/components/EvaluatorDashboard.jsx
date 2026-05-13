@@ -48,6 +48,15 @@ const formatCurrencySimple = (value) => {
   return (num / 10000).toLocaleString() + '만원';
 };
 
+// 입력용 천단위 구분기호 포맷터
+const formatInputCurrency = (value) => {
+  if (!value) return '';
+  const num = value.toString().replace(/[^0-9]/g, '');
+  if (!num) return '';
+  return Number(num).toLocaleString() + '원';
+};
+
+
 
 // 근속연수 계산기
 const calculateTenure = (hireDate) => {
@@ -128,7 +137,12 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
           <div>
             <input 
               type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
-              placeholder="제시 연봉 (예: 7,200만원)" value={offer} onChange={(e) => setOffer(e.target.value)}
+              placeholder="제시 연봉 (예: 72,000,000원)" 
+              value={formatInputCurrency(offer)} 
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                setOffer(rawValue);
+              }}
             />
           </div>
 
@@ -266,7 +280,12 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
               <div>
                 <input 
                   type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
-                  placeholder="제안 연봉" value={proposedSalary} onChange={(e) => setProposedSalary(e.target.value)}
+                  placeholder="제안 연봉 (예: 50,000,000원)" 
+                  value={formatInputCurrency(proposedSalary)} 
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                    setProposedSalary(rawValue);
+                  }}
                 />
               </div>
               <div className="p-4 bg-[var(--color-primary)]/5 rounded-2xl border border-[var(--color-primary)]/10 flex items-center justify-between">
