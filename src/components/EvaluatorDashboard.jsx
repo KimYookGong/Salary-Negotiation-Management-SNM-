@@ -295,42 +295,58 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      console.log('Starting fetchData in EvaluatorDashboard...');
       
       const { data: negs, error: negsError } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
-      if (negsError) throw negsError;
+      if (negsError) {
+        console.error('Negotiations fetch error:', negsError);
+        throw negsError;
+      }
+      console.log('Negotiations fetched:', negs?.length || 0);
       if (negs) setNegotiations(negs);
 
       const { data: emps, error: empsError } = await supabase.from('employees').select('*');
-      if (empsError) throw empsError;
+      if (empsError) {
+        console.error('Employees fetch error:', empsError);
+        throw empsError;
+      }
+      console.log('Employees fetched:', emps?.length || 0);
       if (emps) setEmployees(emps);
 
       const { data: companyBudget, error: budgetError } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
-      // Error handling for budgets will be handled below if null
+      if (budgetError && budgetError.code !== 'PGRST116') {
+        console.error('Budget fetch error:', budgetError);
+      }
       
       const { data: deptBudgets, error: deptError } = await supabase.from('department_budgets').select('*');
-      if (deptError) throw deptError;
+      if (deptError) {
+        console.error('Dept budgets fetch error:', deptError);
+      }
       
       // 더미 데이터 초기화 (데이터가 없을 경우)
-      if (!companyBudget || budgetError) {
-        console.log('Initializing dummy company budget...');
-        const { data: newBudget } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
-        setBudgets(prev => ({ ...prev, company: newBudget }));
+      if (!companyBudget && (!budgetError || budgetError.code === 'PGRST116')) {
+        console.log('No company budget found, attempting to initialize...');
+        const { data: newBudget, error: insError } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
+        if (insError) console.error('Budget initialization failed:', insError);
+        if (newBudget) setBudgets(prev => ({ ...prev, company: newBudget }));
       } else {
         setBudgets(prev => ({ ...prev, company: companyBudget }));
       }
 
       if (!deptBudgets || deptBudgets.length === 0) {
-        console.log('Initializing dummy department budgets...');
-        const depts = ['운영팀', '인사팀', '마케팅팀', '개발팀', '디자인팀'];
+        console.log('No department budgets found, attempting to initialize...');
+        const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
         const dummyDepts = depts.map(d => ({ department_name: d, total_budget: 200000000, used_budget: 0 }));
-        const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
+        const { data: newDepts, error: upsertError } = await supabase.from('department_budgets').upsert(dummyDepts).select();
+        if (upsertError) console.error('Dept budget initialization failed:', upsertError);
         setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
       } else {
         setBudgets(prev => ({ ...prev, depts: deptBudgets }));
       }
 
     } catch (error) {
-      console.error('Error fetching data in EvaluatorDashboard:', error);
+      console.error('CRITICAL: Error fetching data in EvaluatorDashboard:', error);
+      alert(`데이터를 불러오는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     } finally {
       setLoading(false);
     }
@@ -412,7 +428,14 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       {currentTab === 'dashboard' && (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
           {/* Dashboard Header with Filter */}
-          <div className="flex items-center justify-end shrink-0 px-2">
+          <div className="flex items-center justify-between shrink-0 px-2">
+            <button 
+              onClick={() => fetchData()} 
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl transition-all text-xs font-bold"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              데이터 새로고침
+            </button>
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
               <Filter size={16} className="text-gray-400" />
               <span className="text-xs font-black text-gray-400 uppercase tracking-tighter mr-2">부서 필터</span>
