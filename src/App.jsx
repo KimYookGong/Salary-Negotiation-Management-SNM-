@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { supabase } from './supabaseClient';
+import React, { useState, useEffect } from 'react';
+import { supabase, testSupabaseConnection } from './supabaseClient';
 import Layout from './components/Layout';
 import EvaluateeDashboard from './components/EvaluateeDashboard';
 import EvaluatorDashboard from './components/EvaluatorDashboard';
@@ -8,12 +8,13 @@ import Auth from './components/Auth';
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [userRole, setUserRole] = useState('evaluator'); // 'evaluatee' or 'evaluator'
+  const [userRole, setUserRole] = useState(null); // 초기값을 null로 설정하여 데이터 로드 전 잘못된 렌더링 방지
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = async (userId) => {
     try {
+      console.log('Fetching profile for:', userId);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -23,46 +24,47 @@ function App() {
       if (error) {
         if (error.code === 'PGRST116') {
           console.warn('Profile not found for user:', userId);
-          // 프로필이 없는 경우 기본값 설정 또는 다른 처리
           setUserRole('evaluatee'); 
         } else {
           throw error;
         }
       } else if (data) {
+        console.log('Profile loaded with role:', data.role);
         setProfile(data);
         setUserRole(data.role || 'evaluatee');
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+      setUserRole('evaluatee');
     }
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
-
-    // 안전장치: 6초 후에는 무조건 로딩 해제
-    const timer = setTimeout(() => {
-      if (mounted) {
-        console.warn('Loading safety timeout reached');
-        setLoading(false);
-      }
-    }, 6000);
 
     const initialize = async () => {
       try {
+        setLoading(true);
+        console.log('Initializing app session...');
+        
+        // 연결 테스트 (디버깅용)
+        await testSupabaseConnection();
+
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         if (!mounted) return;
 
         setSession(initialSession);
         if (initialSession) {
+          console.log('Initial session found for:', initialSession.user.email);
           await fetchProfile(initialSession.user.id);
+        } else {
+          console.log('No initial session found.');
         }
       } catch (err) {
         console.error('Initialization error:', err);
       } finally {
         if (mounted) {
           setLoading(false);
-          clearTimeout(timer);
         }
       }
     };
@@ -70,11 +72,12 @@ function App() {
     initialize();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change event:', event);
       if (!mounted) return;
       
       setSession(session);
       if (session) {
-        if (event === 'SIGNED_IN') {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           setLoading(true);
           await fetchProfile(session.user.id);
           setLoading(false);
@@ -83,19 +86,19 @@ function App() {
         }
       } else {
         setProfile(null);
+        setUserRole(null);
         setLoading(false);
       }
     });
 
     return () => {
       mounted = false;
-      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
 
-  // 실시간 알림 설정 (피평가자가 새로운 요구안을 제출했을 때)
-  React.useEffect(() => {
+  // 실시간 알림 설정
+  useEffect(() => {
     if (!session || !userRole) return;
 
     const channel = supabase
@@ -120,8 +123,8 @@ function App() {
     };
   }, [userRole, session]);
 
-  // Handle custom actions from sidebar
-  React.useEffect(() => {
+  // Sidebar 액션 처리
+  useEffect(() => {
     if (currentTab === 'switch-role') {
       setUserRole(prev => prev === 'evaluator' ? 'evaluatee' : 'evaluator');
       setCurrentTab('negotiation');
@@ -129,6 +132,8 @@ function App() {
   }, [currentTab]);
 
   const renderContent = () => {
+    if (!userRole) return null;
+
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
       return userRole === 'evaluator' 
         ? <EvaluatorDashboard profile={profile} currentTab={currentTab} /> 
@@ -145,7 +150,10 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
-        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-sm font-bold text-gray-400">데이터를 동기화하는 중...</p>
+        </div>
       </div>
     );
   }
@@ -157,7 +165,7 @@ function App() {
   return (
     <div className="app-container">
       <Layout 
-        userRole={userRole} 
+        userRole={userRole || 'evaluatee'} 
         currentTab={currentTab} 
         setCurrentTab={setCurrentTab}
         session={session}
