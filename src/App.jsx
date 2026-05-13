@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { supabase, testSupabaseConnection } from './supabaseClient';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from './supabaseClient';
 import Layout from './components/Layout';
 import EvaluateeDashboard from './components/EvaluateeDashboard';
 import EvaluatorDashboard from './components/EvaluatorDashboard';
@@ -11,8 +11,8 @@ function App() {
   const [userRole, setUserRole] = useState(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const isInitializing = useRef(false); // 중복 초기화 방지용
 
-  // 프로필 정보를 가져오거나 없으면 생성하는 함수
   const fetchProfile = async (userId) => {
     try {
       console.log('Fetching profile for:', userId);
@@ -23,7 +23,6 @@ function App() {
         .single();
       
       if (error && error.code === 'PGRST116') {
-        // 프로필이 없는 경우 자동 생성 로직
         console.log('No profile found, creating default profile...');
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -50,72 +49,64 @@ function App() {
         }
         
         if (newProfile) {
-          console.log('Default profile created successfully');
           setProfile(newProfile);
           setUserRole(newProfile.role);
         }
       } else if (data) {
-        console.log('Profile loaded with role:', data.role);
         setProfile(data);
         setUserRole(data.role || 'evaluatee');
       }
     } catch (error) {
-      console.error('Critical profile error:', error);
+      console.error('Profile error:', error);
       setUserRole('evaluatee');
     }
   };
 
   useEffect(() => {
     let mounted = true;
-
-    const safetyTimer = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('Safety timeout: forcing loading off');
+    
+    // [강력한 안전장치] 어떤 경우에도 4초 후에는 로딩을 강제 종료
+    const timer = setTimeout(() => {
+      if (mounted) {
+        console.warn('Safety timeout reached - forcing loading screen off');
         setLoading(false);
       }
-    }, 5000);
+    }, 4000);
 
-    const initialize = async () => {
+    const initApp = async () => {
+      if (isInitializing.current) return;
+      isInitializing.current = true;
+
       try {
-        setLoading(true);
-        console.log('Initializing app...');
+        console.log('Initializing application session...');
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         
-        // 연결 테스트
-        testSupabaseConnection();
+        if (!mounted) return;
 
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setSession(initialSession);
-          if (initialSession) {
-            console.log('Session exists, fetching profile...');
-            await fetchProfile(initialSession.user.id);
-          } else {
-            console.log('No active session.');
-          }
+        setSession(currentSession);
+        if (currentSession) {
+          await fetchProfile(currentSession.user.id);
         }
       } catch (err) {
-        console.error('Initialization error:', err);
+        console.error('Init error:', err);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          clearTimeout(timer);
+        }
       }
     };
 
-    initialize();
+    initApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted) return;
-      console.log('Auth event:', event);
-      setSession(session);
+      console.log('Auth event notification:', event);
       
-      if (session) {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setLoading(true);
-          await fetchProfile(session.user.id);
-          setLoading(false);
-        } else {
-          await fetchProfile(session.user.id);
-        }
+      setSession(newSession);
+      if (newSession) {
+        // 인증 이벤트 시 프로필만 조용히 업데이트 (로딩 화면 간섭 방지)
+        fetchProfile(newSession.user.id);
       } else {
         setProfile(null);
         setUserRole(null);
@@ -124,7 +115,7 @@ function App() {
 
     return () => {
       mounted = false;
-      clearTimeout(safetyTimer);
+      clearTimeout(timer);
       subscription.unsubscribe();
     };
   }, []);
@@ -155,7 +146,7 @@ function App() {
     };
   }, [userRole, session]);
 
-  // Sidebar 액션 처리
+  // Sidebar 액션
   useEffect(() => {
     if (currentTab === 'switch-role') {
       setUserRole(prev => prev === 'evaluator' ? 'evaluatee' : 'evaluator');
@@ -164,14 +155,14 @@ function App() {
   }, [currentTab]);
 
   const renderContent = () => {
-    if (!userRole) {
+    if (!userRole && !loading) {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400">
-          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin mb-4"></div>
-          <p className="font-bold text-sm">사용자 정보를 확인하고 있습니다...</p>
+          <p className="font-bold">사용자 권한을 확인 중입니다...</p>
         </div>
       );
     }
+    if (!userRole) return null;
 
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
       return userRole === 'evaluator' 
@@ -184,8 +175,9 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
-        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8F9FA]">
+        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-400 font-bold animate-pulse">시스템 최적화 중...</p>
       </div>
     );
   }
@@ -194,13 +186,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <Layout 
-        userRole={userRole || 'evaluatee'} 
-        currentTab={currentTab} 
-        setCurrentTab={setCurrentTab}
-        session={session}
-        profile={profile}
-      >
+      <Layout userRole={userRole || 'evaluatee'} currentTab={currentTab} setCurrentTab={setCurrentTab} session={session} profile={profile}>
         {renderContent()}
       </Layout>
     </div>
