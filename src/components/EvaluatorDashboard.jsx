@@ -378,6 +378,18 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
     else { alert('상태가 업데이트되었습니다.'); setIsPopupOpen(false); setSelectedNegotiation(null); fetchData(); }
   };
 
+  const handleDeleteNegotiation = async (id) => {
+    if (!window.confirm('정말 이 협상 제안을 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('negotiations').delete().eq('id', id);
+    if (error) alert('삭제 중 오류가 발생했습니다.');
+    else {
+      alert('삭제되었습니다.');
+      setSelectedNegotiation(null);
+      fetchData();
+    }
+  };
+
+
   const handleSalaryProposal = async (rating, salary, rate) => {
     if (!selectedEmployeeForSalary) return;
     const additionalCost = Number(salary.replace(/[^0-9]/g, '')) - Number(selectedEmployeeForSalary.current_salary);
@@ -576,7 +588,22 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-50 overflow-y-auto">
               <div className="p-10">
                 <div className="flex justify-between items-start mb-10"><div className="flex items-center gap-5"><div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300"><User size={32} /></div><div><h2 className="text-3xl font-black text-gray-900">{selectedNegotiation.evaluatee_name}</h2><div className="flex items-center gap-2 mt-1"><p className="text-sm font-bold text-gray-500">{selectedNegotiation.department} {selectedNegotiation.position}</p>{selectedNegotiation.performance_rating && <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-0.5 rounded-md">{selectedNegotiation.performance_rating}등급</span>}</div></div></div><button onClick={() => setSelectedNegotiation(null)} className="p-2 hover:bg-gray-50 rounded-xl"><X size={24} className="text-gray-400" /></button></div>
-                <div className="space-y-10"><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section><section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section><div className="grid grid-cols-2 gap-4 pt-6"><button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4">즉시 수락 및 합의</button><button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4">조건 제시</button></div></div>
+                <div className="space-y-10">
+                  <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section>
+                  <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section>
+                  <div className="grid grid-cols-2 gap-4 pt-6">
+                    <button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4 text-sm">즉시 수락 및 합의</button>
+                    <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-sm">조건 제시</button>
+                  </div>
+                  <div className="pt-6 border-t border-gray-50">
+                    <button 
+                      onClick={() => handleDeleteNegotiation(selectedNegotiation.id)}
+                      className="w-full py-4 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2"
+                    >
+                      <X size={18} /> 협상 제안 삭제하기
+                    </button>
+                  </div>
+                </div>
               </div>
             </motion.div>
           </>
