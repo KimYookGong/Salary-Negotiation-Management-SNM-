@@ -26,7 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const statusMap = {
   submitted: { label: '대기중', className: 'bg-orange-100 text-orange-700' },
   under_review: { label: '검토중', className: 'bg-blue-100 text-blue-700' },
-  counter_offer: { label: '제시중', className: 'bg-purple-100 text-purple-700' }, // '역제시중' -> '제시중'
+  counter_offer: { label: '제시중', className: 'bg-purple-100 text-purple-700' },
   final_agreement: { label: '수락됨', className: 'bg-green-100 text-green-700' },
   rejected: { label: '거절됨', className: 'bg-red-100 text-red-700' },
 };
@@ -42,18 +42,17 @@ const formatCurrency = (value) => {
 };
 
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
-  const radius = 35;
+  const radius = 32;
   const circumference = 2 * Math.PI * radius;
-  // 잔여량을 표시하도록 변경
   const remainingPercentage = Math.max(0, 100 - percentage);
   const offset = circumference - (remainingPercentage / 100) * circumference;
 
   return (
     <div className="relative flex flex-col items-center">
-      <svg className="w-24 h-24 transform -rotate-90">
-        <circle cx="48" cy="48" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="8" fill="transparent" />
+      <svg className="w-20 h-20 transform -rotate-90">
+        <circle cx="40" cy="40" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="6" fill="transparent" />
         <circle 
-          cx="48" cy="48" r={radius} stroke={color} strokeWidth="8" fill="transparent"
+          cx="40" cy="40" r={radius} stroke={color} strokeWidth="6" fill="transparent"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
@@ -61,8 +60,8 @@ const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
         />
       </svg>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-        <span className="text-lg font-black text-gray-900">{Math.round(remainingPercentage)}%</span>
-        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
+        <span className="text-sm font-black text-gray-900">{Math.round(remainingPercentage)}%</span>
+        <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
       </div>
     </div>
   );
@@ -413,15 +412,19 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 shrink-0">
-            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-12">
-                  <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
-                  <div className="flex items-center gap-12">
-                    <p className="text-3xl font-black text-gray-900">{formatCurrency(currentBudgetContext.limit)}</p>
-                    <div className="w-[1px] h-8 bg-gray-100" />
-                    <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrency(currentBudgetContext.used)}</p>
+          <div className="flex shrink-0">
+            <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-8">
+              <div className="flex items-center gap-6">
+                <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
+                <div className="flex items-center gap-8">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">총 인상 예산</p>
+                    <p className="text-xl font-black text-gray-900 leading-tight">{formatCurrency(currentBudgetContext.limit)}</p>
+                  </div>
+                  <div className="w-[1px] h-6 bg-gray-100" />
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">현재 사용액</p>
+                    <p className="text-xl font-black text-[var(--color-primary)] leading-tight">{formatCurrency(currentBudgetContext.used)}</p>
                   </div>
                 </div>
               </div>
