@@ -17,7 +17,8 @@ import {
   Percent,
   Wallet,
   ArrowUpRight,
-  ShieldAlert
+  ShieldAlert,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
