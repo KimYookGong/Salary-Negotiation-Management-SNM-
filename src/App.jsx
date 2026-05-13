@@ -8,7 +8,7 @@ import Auth from './components/Auth';
 function App() {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [userRole, setUserRole] = useState(null); // 초기값을 null로 설정하여 데이터 로드 전 잘못된 렌더링 방지
+  const [userRole, setUserRole] = useState(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
@@ -42,13 +42,21 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
+    // 안전장치: 어떤 이유로든 8초 이상 로딩이 지속되면 강제로 로딩 해제
+    const safetyTimer = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Loading safety timeout reached. Forcing loading to false.');
+        setLoading(false);
+      }
+    }, 8000);
+
     const initialize = async () => {
       try {
         setLoading(true);
         console.log('Initializing app session...');
         
-        // 연결 테스트 (디버깅용)
-        await testSupabaseConnection();
+        // 연결 테스트는 비동기로만 실행 (차단 방지)
+        testSupabaseConnection();
 
         const { data: { session: initialSession } } = await supabase.auth.getSession();
         if (!mounted) return;
@@ -76,23 +84,30 @@ function App() {
       if (!mounted) return;
       
       setSession(session);
-      if (session) {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setLoading(true);
-          await fetchProfile(session.user.id);
-          setLoading(false);
+      try {
+        if (session) {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            setLoading(true);
+            await fetchProfile(session.user.id);
+          } else {
+            await fetchProfile(session.user.id);
+          }
         } else {
-          fetchProfile(session.user.id);
+          setProfile(null);
+          setUserRole(null);
         }
-      } else {
-        setProfile(null);
-        setUserRole(null);
-        setLoading(false);
+      } catch (err) {
+        console.error('Error in onAuthStateChange:', err);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
   }, []);
