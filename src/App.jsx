@@ -12,6 +12,7 @@ function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
 
+  // 프로필 정보를 가져오거나 없으면 생성하는 함수
   const fetchProfile = async (userId) => {
     try {
       console.log('Fetching profile for:', userId);
@@ -21,12 +22,37 @@ function App() {
         .eq('id', userId)
         .single();
       
-      if (error) {
-        if (error.code === 'PGRST116') {
-          console.warn('Profile not found for user:', userId);
-          setUserRole('evaluatee'); 
-        } else {
-          throw error;
+      if (error && error.code === 'PGRST116') {
+        // 프로필이 없는 경우 자동 생성 로직
+        console.log('No profile found, creating default profile...');
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const defaultName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
+        const defaultRole = user?.user_metadata?.role || 'evaluatee';
+        const defaultDept = user?.user_metadata?.department || '인사팀';
+
+        const { data: newProfile, error: createError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            id: userId, 
+            full_name: defaultName,
+            role: defaultRole,
+            department: defaultDept,
+            position: '사원'
+          }])
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Profile creation failed:', createError);
+          setUserRole('evaluatee');
+          return;
+        }
+        
+        if (newProfile) {
+          console.log('Default profile created successfully');
+          setProfile(newProfile);
+          setUserRole(newProfile.role);
         }
       } else if (data) {
         console.log('Profile loaded with role:', data.role);
@@ -34,7 +60,7 @@ function App() {
         setUserRole(data.role || 'evaluatee');
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error('Critical profile error:', error);
       setUserRole('evaluatee');
     }
   };
@@ -42,66 +68,57 @@ function App() {
   useEffect(() => {
     let mounted = true;
 
-    // 안전장치: 어떤 이유로든 8초 이상 로딩이 지속되면 강제로 로딩 해제
     const safetyTimer = setTimeout(() => {
       if (mounted && loading) {
-        console.warn('Loading safety timeout reached. Forcing loading to false.');
+        console.warn('Safety timeout: forcing loading off');
         setLoading(false);
       }
-    }, 8000);
+    }, 5000);
 
     const initialize = async () => {
       try {
         setLoading(true);
-        console.log('Initializing app session...');
+        console.log('Initializing app...');
         
-        // 연결 테스트는 비동기로만 실행 (차단 방지)
+        // 연결 테스트
         testSupabaseConnection();
 
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        if (!mounted) return;
-
-        setSession(initialSession);
-        if (initialSession) {
-          console.log('Initial session found for:', initialSession.user.email);
-          await fetchProfile(initialSession.user.id);
-        } else {
-          console.log('No initial session found.');
+        
+        if (mounted) {
+          setSession(initialSession);
+          if (initialSession) {
+            console.log('Session exists, fetching profile...');
+            await fetchProfile(initialSession.user.id);
+          } else {
+            console.log('No active session.');
+          }
         }
       } catch (err) {
         console.error('Initialization error:', err);
       } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       }
     };
 
     initialize();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change event:', event);
       if (!mounted) return;
-      
+      console.log('Auth event:', event);
       setSession(session);
-      try {
-        if (session) {
-          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-            setLoading(true);
-            await fetchProfile(session.user.id);
-          } else {
-            await fetchProfile(session.user.id);
-          }
-        } else {
-          setProfile(null);
-          setUserRole(null);
-        }
-      } catch (err) {
-        console.error('Error in onAuthStateChange:', err);
-      } finally {
-        if (mounted) {
+      
+      if (session) {
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          setLoading(true);
+          await fetchProfile(session.user.id);
           setLoading(false);
+        } else {
+          await fetchProfile(session.user.id);
         }
+      } else {
+        setProfile(null);
+        setUserRole(null);
       }
     });
 
@@ -147,7 +164,14 @@ function App() {
   }, [currentTab]);
 
   const renderContent = () => {
-    if (!userRole) return null;
+    if (!userRole) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh] text-gray-400">
+          <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-400 rounded-full animate-spin mb-4"></div>
+          <p className="font-bold text-sm">사용자 정보를 확인하고 있습니다...</p>
+        </div>
+      );
+    }
 
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
       return userRole === 'evaluator' 
@@ -155,27 +179,18 @@ function App() {
         : <EvaluateeDashboard profile={profile} />;
     }
     
-    return (
-      <div className="card text-center py-24 bg-gray-50 border-dashed flex flex-col items-center justify-center">
-        <p className="text-[var(--text-muted)] font-medium">준비 중인 페이지입니다.</p>
-      </div>
-    );
+    return <div className="p-12 text-center text-gray-400">준비 중인 페이지입니다.</div>;
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-bold text-gray-400">데이터를 동기화하는 중...</p>
-        </div>
+        <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
-  if (!session) {
-    return <Auth />;
-  }
+  if (!session) return <Auth />;
 
   return (
     <div className="app-container">
