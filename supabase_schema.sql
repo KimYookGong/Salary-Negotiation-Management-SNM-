@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS negotiations (
   score DECIMAL(3, 2),
   jd TEXT,
   reason TEXT,
+  hire_date DATE, -- [ADD] 입사일 컬럼 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -47,6 +48,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
   employee_id TEXT,
   role TEXT DEFAULT 'evaluatee',
+  hire_date DATE, -- [ADD] 입사일 컬럼 추가
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -58,6 +60,7 @@ CREATE TABLE IF NOT EXISTS employees (
   position position_type NOT NULL,
   current_salary BIGINT DEFAULT 0,
   performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
+  hire_date DATE, -- [ADD] 입사일 컬럼 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

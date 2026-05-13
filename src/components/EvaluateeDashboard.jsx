@@ -34,6 +34,25 @@ const formatCurrency = (value) => {
   return (num / 10000).toLocaleString() + '만원';
 };
 
+// 근속연수 계산기
+const calculateTenure = (hireDate) => {
+  if (!hireDate) return '-';
+  const joinDate = new Date(hireDate);
+  const now = new Date();
+  
+  let years = now.getFullYear() - joinDate.getFullYear();
+  let months = now.getMonth() - joinDate.getMonth();
+  
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  if (years === 0) return `${months}개월`;
+  return `${years}년 ${months}개월`;
+};
+
+
 const EvaluateeDashboard = ({ profile }) => {
   const [negotiation, setNegotiation] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -132,6 +151,14 @@ const EvaluateeDashboard = ({ profile }) => {
             <p className="text-sm font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md inline-block">{profile?.performance_rating}</p>
           </div>
         )}
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">입사일</p>
+          <p className="text-sm font-bold text-gray-700">{profile?.hire_date || '-'}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5">근속연수</p>
+          <p className="text-sm font-black text-[var(--color-secondary)]">{calculateTenure(profile?.hire_date)}</p>
+        </div>
       </div>
 
       {/* Active Negotiation Card */}

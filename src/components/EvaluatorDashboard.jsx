@@ -41,6 +41,25 @@ const formatCurrency = (value) => {
   return (num / 10000).toLocaleString() + '만원';
 };
 
+// 근속연수 계산기
+const calculateTenure = (hireDate) => {
+  if (!hireDate) return '-';
+  const joinDate = new Date(hireDate);
+  const now = new Date();
+  
+  let years = now.getFullYear() - joinDate.getFullYear();
+  let months = now.getMonth() - joinDate.getMonth();
+  
+  if (months < 0) {
+    years--;
+    months += 12;
+  }
+  
+  if (years === 0) return `${months}개월`;
+  return `${years}년 ${months}개월`;
+};
+
+
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
@@ -186,6 +205,10 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
               <div className="flex justify-between">
                 <span className="text-sm font-bold text-gray-400">현재 연봉</span>
                 <span className="text-sm font-black text-gray-900">{formatCurrency(employee.current_salary)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm font-bold text-gray-400">입사일 / 근속</span>
+                <span className="text-sm font-bold text-gray-600">{employee.hire_date || '-'} ({calculateTenure(employee.hire_date)})</span>
               </div>
             </div>
 
@@ -449,6 +472,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                     <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('full_name')}>성명</th>
                     <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('department')}>부서</th>
                     <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('position')}>직급</th>
+                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('hire_date')}>입사일</th>
+                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">근속연수</th>
                     <th className="px-8 py-5 text-right text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('current_salary')}>현재 연봉</th>
                     <th className="px-8 py-5 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('performance_rating')}>평가 등급</th>
                   </tr>
@@ -459,6 +484,8 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                       <td className="px-8 py-5"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center"><User size={20} /></div><p className="text-sm font-black text-gray-900">{emp.full_name}</p></div></td>
                       <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.department}</td>
                        <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.position}</td>
+                      <td className="px-8 py-5 text-sm font-medium text-gray-500">{emp.hire_date || '-'}</td>
+                      <td className="px-8 py-5 text-sm font-black text-[var(--color-primary)]">{calculateTenure(emp.hire_date)}</td>
                       <td className="px-8 py-5 text-right text-sm font-black text-gray-900">{formatCurrency(emp.current_salary)}</td>
                       <td className="px-8 py-5 text-center">
                         <span className={`inline-block px-3 py-1 rounded-lg text-xs font-black border ${
