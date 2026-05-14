@@ -11,6 +11,7 @@ function App() {
   const [userRole, setUserRole] = useState(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [currentYear, setCurrentYear] = useState(2026); // 연도 전역 상태 추가
   const isInitializing = useRef(false); // 중복 초기화 방지용
 
   const fetchProfile = async (userId) => {
@@ -166,8 +167,8 @@ function App() {
 
     if (currentTab === 'dashboard' || currentTab === 'negotiation') {
       return userRole === 'evaluator' 
-        ? <EvaluatorDashboard profile={profile} currentTab={currentTab} /> 
-        : <EvaluateeDashboard profile={profile} />;
+        ? <EvaluatorDashboard profile={profile} currentTab={currentTab} currentYear={currentYear} /> 
+        : <EvaluateeDashboard profile={profile} currentYear={currentYear} />;
     }
     
     return <div className="p-12 text-center text-gray-400">준비 중인 페이지입니다.</div>;
@@ -186,7 +187,15 @@ function App() {
 
   return (
     <div className="app-container">
-      <Layout userRole={userRole || 'evaluatee'} currentTab={currentTab} setCurrentTab={setCurrentTab} session={session} profile={profile}>
+      <Layout 
+        userRole={userRole || 'evaluatee'} 
+        currentTab={currentTab} 
+        setCurrentTab={setCurrentTab} 
+        session={session} 
+        profile={profile}
+        currentYear={currentYear}
+        setCurrentYear={setCurrentYear}
+      >
         {renderContent()}
       </Layout>
     </div>

@@ -17,7 +17,27 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- 1. 연봉 협상 테이블
+-- 1. 사원 인증용 마스터 테이블 (고정 정보)
+CREATE TABLE IF NOT EXISTS employees (
+  employee_id TEXT PRIMARY KEY,
+  full_name TEXT NOT NULL,
+  department department_type NOT NULL,
+  hire_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. 사원 히스토리 테이블 (연도별 변동 정보)
+CREATE TABLE IF NOT EXISTS employee_history (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_id TEXT REFERENCES employees(employee_id) ON DELETE CASCADE,
+  year INTEGER NOT NULL,
+  position position_type NOT NULL,
+  salary BIGINT DEFAULT 0,
+  performance_rating performance_rating_type,
+  UNIQUE(employee_id, year)
+);
+
+-- 3. 연봉 협상 테이블
 CREATE TABLE IF NOT EXISTS negotiations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   evaluatee_id UUID REFERENCES auth.users(id),
@@ -25,7 +45,8 @@ CREATE TABLE IF NOT EXISTS negotiations (
   department department_type NOT NULL,
   position position_type,
   current_salary BIGINT DEFAULT 0,
-  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
+  performance_rating performance_rating_type,
+  year INTEGER NOT NULL DEFAULT 2026, -- 연도 정보 추가
   status TEXT NOT NULL DEFAULT 'submitted',
   evaluatee_proposal TEXT,
   evaluator_proposal TEXT,
@@ -33,98 +54,138 @@ CREATE TABLE IF NOT EXISTS negotiations (
   score DECIMAL(3, 2),
   jd TEXT,
   reason TEXT,
-  hire_date DATE, -- [ADD] 입사일 컬럼 추가
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. 사용자 프로필 테이블
+-- 4. 사용자 프로필 테이블 (현재 상태 스냅샷)
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name TEXT,
   department department_type,
   position position_type,
   current_salary BIGINT DEFAULT 0,
-  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
+  performance_rating performance_rating_type,
   employee_id TEXT,
   role TEXT DEFAULT 'evaluatee',
-  hire_date DATE, -- [ADD] 입사일 컬럼 추가
+  hire_date DATE,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. 사원 인증용 마스터 테이블
-CREATE TABLE IF NOT EXISTS employees (
-  employee_id TEXT PRIMARY KEY,
-  full_name TEXT NOT NULL,
-  department department_type NOT NULL,
-  position position_type NOT NULL,
-  current_salary BIGINT DEFAULT 0,
-  performance_rating performance_rating_type, -- [ADD] 평가등급 컬럼 추가
-  hire_date DATE, -- [ADD] 입사일 컬럼 추가
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 4. 예산 테이블 (회사 전체)
+-- 5. 예산 테이블 (회사 전체)
 CREATE TABLE IF NOT EXISTS budgets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  year INTEGER NOT NULL,
-  total_budget BIGINT NOT NULL,
+  year INTEGER NOT NULL UNIQUE,
+  total_budget BIGINT NOT NULL DEFAULT 0,
   used_budget BIGINT DEFAULT 0,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 5. 부서별 예산 테이블
+-- 6. 부서별 예산 테이블
 CREATE TABLE IF NOT EXISTS department_budgets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  department_name department_type NOT NULL UNIQUE,
-  total_budget BIGINT NOT NULL,
+  department_name department_type NOT NULL,
+  year INTEGER NOT NULL DEFAULT 2026, -- 연도 정보 추가
+  total_budget BIGINT NOT NULL DEFAULT 0,
   used_budget BIGINT DEFAULT 0,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(department_name, year)
 );
 
--- RLS 정책 추가
-ALTER TABLE department_budgets ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow all actions for now" ON department_budgets;
-CREATE POLICY "Allow all actions for now" ON department_budgets FOR ALL USING (true);
+-- RLS 설정
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for now" ON employees FOR ALL USING (true);
 
+ALTER TABLE employee_history ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for now" ON employee_history FOR ALL USING (true);
 
--- RLS 설정 및 정책 초기화
 ALTER TABLE negotiations ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Allow all actions for now" ON negotiations;
-CREATE POLICY "Allow all actions for now" ON negotiations FOR ALL USING (true);
+CREATE POLICY "Allow all for now" ON negotiations FOR ALL USING (true);
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON profiles;
-CREATE POLICY "Profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
-DROP POLICY IF EXISTS "Users can update their own profiles" ON profiles;
-CREATE POLICY "Users can update their own profiles" ON profiles FOR UPDATE USING (auth.uid() = id);
-DROP POLICY IF EXISTS "Users can insert their own profiles" ON profiles;
-CREATE POLICY "Users can insert their own profiles" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
-
-ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Employees are viewable by everyone" ON employees;
-CREATE POLICY "Employees are viewable by everyone" ON employees FOR SELECT USING (true);
+CREATE POLICY "Allow all for now" ON profiles FOR ALL USING (true);
 
 ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "Budgets are viewable by everyone" ON budgets;
-CREATE POLICY "Allow all actions for now" ON budgets FOR ALL USING (true);
+CREATE POLICY "Allow all for now" ON budgets FOR ALL USING (true);
 
+ALTER TABLE department_budgets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all for now" ON department_budgets FOR ALL USING (true);
 
-
--- 6. 예산 업데이트용 RPC 함수
-CREATE OR REPLACE FUNCTION increment_budget(amount BIGINT, dept department_type)
-RETURNS VOID AS $$
+-- 7. 트리거 함수: 부서 예산 합계를 전체 예산에 반영
+CREATE OR REPLACE FUNCTION sync_total_company_budget()
+RETURNS TRIGGER AS $$
 BEGIN
-  -- 전체 예산 업데이트 (2026년 기준)
-  UPDATE budgets
-  SET used_budget = used_budget + amount,
-      updated_at = NOW()
-  WHERE year = 2026;
+  -- 해당 연도의 전체 예산 레코드가 없으면 생성
+  INSERT INTO budgets (year, total_budget)
+  VALUES (NEW.year, 0)
+  ON CONFLICT (year) DO NOTHING;
 
-  -- 부서 예산 업데이트
-  UPDATE department_budgets
-  SET used_budget = used_budget + amount,
+  -- 해당 연도의 모든 부서 예산 합계를 계산하여 업데이트
+  UPDATE budgets
+  SET total_budget = (SELECT COALESCE(SUM(total_budget), 0) FROM department_budgets WHERE year = NEW.year),
       updated_at = NOW()
-  WHERE department_name = dept;
+  WHERE year = NEW.year;
+  
+  RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_total_budget
+AFTER INSERT OR UPDATE OR DELETE ON department_budgets
+FOR EACH ROW EXECUTE FUNCTION sync_total_company_budget();
+
+-- 8. 트리거 함수: 협상 상태에 따른 예산 자동 동기화
+CREATE OR REPLACE FUNCTION sync_negotiation_budget_auto()
+RETURNS TRIGGER AS $$
+DECLARE
+    old_impact BIGINT := 0;
+    new_impact BIGINT := 0;
+    diff BIGINT := 0;
+    target_year INTEGER;
+    target_dept department_type;
+BEGIN
+    -- 삭제 또는 업데이트 시 이전 영향력 계산
+    IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
+        IF OLD.status NOT IN ('rejected', 'cancelled') AND OLD.evaluator_proposal IS NOT NULL AND OLD.current_salary IS NOT NULL THEN
+            old_impact := OLD.evaluator_proposal::BIGINT - OLD.current_salary::BIGINT;
+        END IF;
+        target_year := OLD.year;
+        target_dept := OLD.department;
+    END IF;
+
+    -- 삽입 또는 업데이트 시 새로운 영향력 계산
+    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+        IF NEW.status NOT IN ('rejected', 'cancelled') AND NEW.evaluator_proposal IS NOT NULL AND NEW.current_salary IS NOT NULL THEN
+            new_impact := NEW.evaluator_proposal::BIGINT - NEW.current_salary::BIGINT;
+        END IF;
+        target_year := NEW.year;
+        target_dept := NEW.department;
+    END IF;
+
+    diff := new_impact - old_impact;
+
+    IF diff <> 0 THEN
+        -- 부서 예산 업데이트
+        UPDATE department_budgets
+        SET used_budget = used_budget + diff,
+            updated_at = NOW()
+        WHERE department_name = target_dept AND year = target_year;
+
+        -- 전체 예산 업데이트
+        UPDATE budgets
+        SET used_budget = used_budget + diff,
+            updated_at = NOW()
+        WHERE year = target_year;
+    END IF;
+
+    IF (TG_OP = 'DELETE') THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_negotiation_budget
+AFTER INSERT OR UPDATE OR DELETE ON negotiations
+FOR EACH ROW EXECUTE FUNCTION sync_negotiation_budget_auto();

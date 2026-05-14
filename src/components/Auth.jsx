@@ -20,14 +20,22 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        // 1. 사원 마스터 테이블에서 정보 일치 여부 확인
+        // 1. 사원 마스터 테이블 및 히스토리(2026년 기준) 확인
         const { data: employee, error: empError } = await supabase
           .from('employees')
-          .select('*')
+          .select(`
+            *,
+            employee_history (
+              position,
+              performance_rating,
+              salary
+            )
+          `)
           .eq('employee_id', employeeId)
           .eq('full_name', fullName)
           .eq('department', department)
-          .single();
+          .eq('employee_history.year', 2026) // 가입 시 기본 2026년 기준 정보 확인
+          .maybeSingle();
 
         if (empError || !employee) {
           throw new Error('사원 정보가 일치하지 않습니다. 이름, 부서, 사번을 다시 확인해주세요.');
@@ -53,6 +61,7 @@ const Auth = () => {
 
         // 4. 프로필 생성
         if (authData.user) {
+          const history = employee.employee_history?.[0] || {};
           const { error: profileError } = await supabase
             .from('profiles')
             .insert([
@@ -60,8 +69,10 @@ const Auth = () => {
                 id: authData.user.id, 
                 full_name: fullName, 
                 department: department, 
-                position: employee.position,
-                performance_rating: employee.performance_rating, // 추가
+                position: history.position || '사원',
+                performance_rating: history.performance_rating || '-',
+                current_salary: history.salary || 0,
+                hire_date: employee.hire_date,
                 employee_id: employeeId,
                 role: assignedRole
               }

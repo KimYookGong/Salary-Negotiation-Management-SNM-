@@ -27,8 +27,9 @@ const statusMap = {
   submitted: { label: '대기중', className: 'bg-orange-100 text-orange-700' },
   under_review: { label: '검토중', className: 'bg-blue-100 text-blue-700' },
   counter_offer: { label: '제시중', className: 'bg-purple-100 text-purple-700' },
-  final_agreement: { label: '수락됨', className: 'bg-green-100 text-green-700' },
-  rejected: { label: '거절됨', className: 'bg-red-100 text-red-700' },
+  final_agreement: { label: '최종 합의', className: 'bg-green-100 text-green-700', icon: CheckCircle },
+  rejected: { label: '거절됨', className: 'bg-red-100 text-red-600', icon: AlertCircle },
+  cancelled: { label: '취소됨', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
 };
 
 // 금액 포맷터
@@ -315,7 +316,7 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
   );
 };
 
-const EvaluatorDashboard = ({ profile, currentTab }) => {
+const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [negotiations, setNegotiations] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [budgets, setBudgets] = useState({ company: null, depts: [] });
@@ -334,27 +335,67 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const { data: negs, error: negsError } = await supabase.from('negotiations').select('*').order('updated_at', { ascending: false });
+      // 협상 데이터 조회 (현재 연도 필터링)
+      const { data: negs, error: negsError } = await supabase
+        .from('negotiations')
+        .select('*')
+        .eq('year', currentYear)
+        .order('updated_at', { ascending: false });
+      
       if (negsError) throw negsError;
       if (negs) setNegotiations(negs);
 
-      const { data: emps, error: empsError } = await supabase.from('employees').select('*');
-      if (empsError) throw empsError;
-      if (emps) setEmployees(emps);
+      // 사원 및 히스토리 조회 (현재 연도 데이터 조인)
+      const { data: emps, error: empsError } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_history (
+            position,
+            salary,
+            performance_rating
+          )
+        `)
+        .eq('employee_history.year', currentYear);
 
-      const { data: companyBudget, error: budgetError } = await supabase.from('budgets').select('*').order('year', { ascending: false }).limit(1).single();
-      const { data: deptBudgets, error: deptError } = await supabase.from('department_budgets').select('*');
+      if (empsError) throw empsError;
       
-      if (!companyBudget && (!budgetError || budgetError.code === 'PGRST116')) {
-        const { data: newBudget } = await supabase.from('budgets').insert([{ year: 2026, total_budget: 1000000000, used_budget: 0 }]).select().single();
-        if (newBudget) setBudgets(prev => ({ ...prev, company: newBudget }));
+      // 데이터 평탄화 (히스토리 정보를 사원 객체에 병합)
+      const flattenedEmps = emps?.map(emp => {
+        const history = emp.employee_history?.[0] || {};
+        return {
+          ...emp,
+          position: history.position || emp.position, // 기본값 유지
+          current_salary: history.salary || 0,
+          performance_rating: history.performance_rating || '-'
+        };
+      }) || [];
+      
+      setEmployees(flattenedEmps);
+
+      // 예산 조회 (현재 연도)
+      const { data: companyBudget, error: budgetError } = await supabase
+        .from('budgets')
+        .select('*')
+        .eq('year', currentYear)
+        .maybeSingle();
+      
+      const { data: deptBudgets, error: deptError } = await supabase
+        .from('department_budgets')
+        .select('*')
+        .eq('year', currentYear);
+      
+      if (!companyBudget && (!budgetError)) {
+        // 해당 연도 예산이 없으면 초기화 (트리거가 자동 생성하겠지만 명시적 처리)
+        setBudgets(prev => ({ ...prev, company: { year: currentYear, total_budget: 0, used_budget: 0 } }));
       } else {
         setBudgets(prev => ({ ...prev, company: companyBudget }));
       }
 
       if (!deptBudgets || deptBudgets.length === 0) {
+        // 부서 예산 초기화 (샘플 데이터)
         const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
-        const dummyDepts = depts.map(d => ({ department_name: d, total_budget: 200000000, used_budget: 0 }));
+        const dummyDepts = depts.map(d => ({ department_name: d, year: currentYear, total_budget: 200000000, used_budget: 0 }));
         const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
         setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
       } else {
@@ -370,31 +411,33 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
 
   useEffect(() => {
     fetchData();
-  }, [currentTab]);
+  }, [currentTab, currentYear]); // currentYear 변경 시 리프레시
 
   const handleStatusUpdate = async (id, status, extra = {}) => {
     const { error } = await supabase.from('negotiations').update({ status, updated_at: new Date(), ...extra }).eq('id', id);
     if (error) alert('업데이트 중 오류가 발생했습니다.');
-    else { alert('상태가 업데이트되었습니다.'); setIsPopupOpen(false); setSelectedNegotiation(null); fetchData(); }
+    else { alert('상태가 업데이트되었습니다. (예산이 자동 동기화되었습니다)'); setIsPopupOpen(false); setSelectedNegotiation(null); fetchData(); }
   };
 
   const handleDeleteNegotiation = async (id) => {
-    if (!window.confirm('정말 이 협상 제안을 삭제하시겠습니까?')) return;
-    const { error } = await supabase.from('negotiations').delete().eq('id', id);
-    if (error) alert('삭제 중 오류가 발생했습니다.');
-    else {
-      alert('삭제되었습니다.');
+    if (!window.confirm('정말 이 협상 제안을 삭제하시겠습니까? 삭제 시 사용된 예산도 복구됩니다.')) return;
+    
+    try {
+      // 협상 데이터 삭제 (트리거가 예산 복구를 자동으로 처리함)
+      const { error: deleteError } = await supabase.from('negotiations').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+
+      alert('삭제되었습니다. 예산이 자동으로 복구되었습니다.');
       setSelectedNegotiation(null);
       fetchData();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('삭제 또는 예산 복구 중 오류가 발생했습니다.');
     }
   };
 
-
   const handleSalaryProposal = async (rating, salary, rate) => {
     if (!selectedEmployeeForSalary) return;
-    const additionalCost = Number(salary.replace(/[^0-9]/g, '')) - Number(selectedEmployeeForSalary.current_salary);
-    
-    await supabase.rpc('increment_budget', { amount: additionalCost, dept: selectedEmployeeForSalary.department });
     
     const { data: userProfile } = await supabase.from('profiles').select('id').eq('employee_id', selectedEmployeeForSalary.employee_id).single();
     const payload = {
@@ -403,17 +446,30 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
       position: selectedEmployeeForSalary.position,
       current_salary: selectedEmployeeForSalary.current_salary,
       performance_rating: rating,
-      evaluator_proposal: formatCurrency(salary),
+      evaluator_proposal: salary.replace(/[^0-9]/g, ''),
+      year: currentYear,
       status: 'counter_offer',
       updated_at: new Date()
     };
+
     if (userProfile) payload.evaluatee_id = userProfile.id;
 
-    const { data: existingNeg } = await supabase.from('negotiations').select('id').eq('evaluatee_name', selectedEmployeeForSalary.full_name).single();
-    if (existingNeg) await supabase.from('negotiations').update(payload).eq('id', existingNeg.id);
-    else await supabase.from('negotiations').insert([payload]);
+    const { data: existingNeg } = await supabase
+      .from('negotiations')
+      .select('id')
+      .eq('evaluatee_name', selectedEmployeeForSalary.full_name)
+      .eq('year', currentYear) // 해당 연도 협상만 확인
+      .single();
 
-    setIsSalaryPopupOpen(false); setSelectedEmployeeForSalary(null); fetchData();
+    if (existingNeg) {
+      await supabase.from('negotiations').update(payload).eq('id', existingNeg.id);
+    } else {
+      await supabase.from('negotiations').insert([payload]);
+    }
+
+    setIsSalaryPopupOpen(false); 
+    setSelectedEmployeeForSalary(null); 
+    fetchData();
   };
 
   const handleSort = (key) => {
@@ -590,7 +646,11 @@ const EvaluatorDashboard = ({ profile, currentTab }) => {
                 <div className="flex justify-between items-start mb-10"><div className="flex items-center gap-5"><div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300"><User size={32} /></div><div><h2 className="text-3xl font-black text-gray-900">{selectedNegotiation.evaluatee_name}</h2><div className="flex items-center gap-2 mt-1"><p className="text-sm font-bold text-gray-500">{selectedNegotiation.department} {selectedNegotiation.position}</p>{selectedNegotiation.performance_rating && <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-0.5 rounded-md">{selectedNegotiation.performance_rating}등급</span>}</div></div></div><button onClick={() => setSelectedNegotiation(null)} className="p-2 hover:bg-gray-50 rounded-xl"><X size={24} className="text-gray-400" /></button></div>
                 <div className="space-y-10">
                   <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section>
+                  {selectedNegotiation.evaluator_proposal && (
+                    <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TrendingUp size={14} /> 인사팀 제안</h4><div className="p-6 bg-blue-50 rounded-3xl border border-blue-100"><p className="text-2xl font-black text-[var(--color-secondary)] mb-1">{formatInputCurrency(selectedNegotiation.evaluator_proposal)}</p><p className="text-xs text-blue-600 font-bold">인상액: {formatCurrencySimple(Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary))}</p></div></section>
+                  )}
                   <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section>
+
                   <div className="grid grid-cols-2 gap-4 pt-6">
                     <button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4 text-sm">즉시 수락 및 합의</button>
                     <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-sm">조건 제시</button>

@@ -11,6 +11,7 @@ const StatusBadge = ({ status }) => {
     counter_offer: { label: '역제시 수신', className: 'badge-counter', icon: AlertCircle },
     final_agreement: { label: '최종 합의', className: 'badge-final', icon: CheckCircle },
     rejected: { label: '거절됨', className: 'bg-red-100 text-red-600', icon: AlertCircle },
+    cancelled: { label: '취소됨', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
   };
 
   const config = configs[status] || configs.submitted;
@@ -52,9 +53,19 @@ const calculateTenure = (hireDate) => {
   return `${years}년 ${months}개월`;
 };
 
+// 입력용 천단위 구분기호 포맷터
+const formatInputCurrency = (value) => {
+  if (!value) return '';
+  const num = value.toString().replace(/[^0-9]/g, '');
+  if (!num) return '';
+  return Number(num).toLocaleString() + '원';
+};
 
-const EvaluateeDashboard = ({ profile }) => {
+
+
+const EvaluateeDashboard = ({ profile, currentYear }) => {
   const [negotiation, setNegotiation] = useState(null);
+  const [history, setHistory] = useState([]); // 히스토리 상태 추가
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
     jd: '',
@@ -66,28 +77,44 @@ const EvaluateeDashboard = ({ profile }) => {
     if (!profile) return;
     setLoading(true);
     
+    // 현재 연도 협상 조회
     const { data, error } = await supabase
       .from('negotiations')
       .select('*')
       .eq('evaluatee_id', profile.id)
-      .single();
+      .eq('year', currentYear)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error('Error fetching negotiation:', error);
-    } else if (data) {
+    } else {
       setNegotiation(data);
-      setFormData({
-        jd: data.jd || '',
-        proposal: data.evaluatee_proposal || '',
-        reason: data.reason || ''
-      });
+      if (data) {
+        setFormData({
+          jd: data.jd || '',
+          proposal: data.evaluatee_proposal || '',
+          reason: data.reason || ''
+        });
+      } else {
+        setFormData({ jd: '', proposal: '', reason: '' });
+      }
     }
+
+    // 전체 히스토리 조회 (최근 5년)
+    const { data: histData } = await supabase
+      .from('employee_history')
+      .select('*')
+      .eq('employee_id', profile.employee_id)
+      .order('year', { ascending: false });
+    
+    if (histData) setHistory(histData);
+
     setLoading(false);
   };
 
   React.useEffect(() => {
     fetchNegotiation();
-  }, [profile]);
+  }, [profile, currentYear]);
 
   const handleSubmit = async () => {
     if (!profile) return;
@@ -97,7 +124,8 @@ const EvaluateeDashboard = ({ profile }) => {
       evaluatee_name: profile.full_name,
       department: profile.department,
       position: profile.position,
-      performance_rating: profile.performance_rating, // 추가
+      performance_rating: profile.performance_rating,
+      year: currentYear, // 현재 연도 추가
       jd: formData.jd,
       evaluatee_proposal: formData.proposal,
       reason: formData.reason,
@@ -185,7 +213,7 @@ const EvaluateeDashboard = ({ profile }) => {
               {negotiation.status === 'counter_offer' && (
                 <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg">
                   <p className="text-xs font-semibold text-orange-800 uppercase mb-2">평가자 역제시</p>
-                  <p className="text-2xl font-bold text-[var(--color-accent-2)]">{negotiation.evaluator_proposal}</p>
+                  <p className="text-2xl font-bold text-[var(--color-accent-2)]">{formatInputCurrency(negotiation.evaluator_proposal)}</p>
                   <p className="mt-3 text-sm text-gray-700 leading-relaxed italic">
                     "{negotiation.evaluator_comment}"
                   </p>
@@ -289,18 +317,23 @@ const EvaluateeDashboard = ({ profile }) => {
           <div className="card">
             <h3 className="text-lg mb-4 flex items-center gap-2">
               <History size={20} className="text-[var(--color-secondary)]" />
-              과거 협상 이력
+              과거 협상 및 고과 이력
             </h3>
             <div className="space-y-4">
-              {[1, 2].map((i) => (
-                <div key={i} className="p-3 border-b border-[var(--border-color)] last:border-0">
+              {history.length > 0 ? history.map((item) => (
+                <div key={item.id} className="p-3 border-b border-[var(--border-color)] last:border-0">
                   <div className="flex justify-between mb-1">
-                    <p className="text-sm font-semibold">2025년 정기 연봉 협상</p>
-                    <span className="text-xs text-green-600 font-bold">합의 완료</span>
+                    <p className="text-sm font-semibold">{item.year}년 정보</p>
+                    <span className="text-xs text-[var(--color-primary)] font-bold">{item.position}</span>
                   </div>
-                  <p className="text-xs text-[var(--text-muted)]">인상률: 8.5%</p>
+                  <div className="flex justify-between text-xs text-[var(--text-muted)]">
+                    <span>연봉: {formatCurrency(item.salary)}</span>
+                    <span className="font-bold">등급: {item.performance_rating}</span>
+                  </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-xs text-gray-400 text-center py-4">조회된 이력이 없습니다.</p>
+              )}
             </div>
           </div>
         </div>
