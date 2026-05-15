@@ -212,8 +212,12 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
   if (!isOpen || !employee) return null;
 
   const additionalCost = Number(proposedSalary.replace(/[^0-9]/g, '')) - Number(employee.current_salary);
-  const totalUsage = budgetData.total ? ((budgetData.total.used + additionalCost) / budgetData.total.limit * 100).toFixed(1) : 0;
-  const deptUsage = budgetData.dept ? ((budgetData.dept.used + additionalCost) / budgetData.dept.limit * 100).toFixed(1) : 0;
+  const totalUsage = budgetData.total && budgetData.total.limit > 0 
+    ? Math.max(0, ((budgetData.total.used + additionalCost) / budgetData.total.limit * 100)).toFixed(1) 
+    : 0;
+  const deptUsage = budgetData.dept && budgetData.dept.limit > 0 
+    ? Math.max(0, ((budgetData.dept.used + additionalCost) / budgetData.dept.limit * 100)).toFixed(1) 
+    : 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
