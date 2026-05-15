@@ -486,6 +486,24 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     setSortConfig({ key, direction });
   };
 
+  const filteredEmployees = React.useMemo(() => {
+    return employees.filter(emp => {
+      const matchSearch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
+      const matchDept = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
+      return matchSearch && matchDept;
+    }).sort((a, b) => {
+      if (sortConfig.key === 'performance_rating') {
+        const ratingOrder = { 'S': 1, 'A': 2, 'B': 3, 'C': 4, 'D': 5 };
+        const valA = ratingOrder[a[sortConfig.key]] || 99;
+        const valB = ratingOrder[b[sortConfig.key]] || 99;
+        return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
+      }
+      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [employees, dbSearchTerm, dbDeptFilter, sortConfig]);
+
   const categorizedEmployees = React.useMemo(() => {
     const cats = {
       not_proposed: [],
@@ -604,11 +622,11 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
             <table className="w-full">
               <thead className="bg-gray-50/50 sticky top-0 z-10">
                 <tr>
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">성명</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">부서 / 직급</th>
-                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">입사일</th>
-                  <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 연봉</th>
-                  <th className="px-8 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 등급</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer hover:text-[var(--color-primary)] transition-colors" onClick={() => handleSort('full_name')}>성명</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer hover:text-[var(--color-primary)] transition-colors" onClick={() => handleSort('department')}>부서 / 직급</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer hover:text-[var(--color-primary)] transition-colors" onClick={() => handleSort('hire_date')}>입사일</th>
+                  <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer hover:text-[var(--color-primary)] transition-colors" onClick={() => handleSort('current_salary')}>현재 연봉</th>
+                  <th className="px-8 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest cursor-pointer hover:text-[var(--color-primary)] transition-colors" onClick={() => handleSort('performance_rating')}>현재 등급</th>
                   <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 이력</th>
                 </tr>
               </thead>
