@@ -515,7 +515,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       performance_rating: rating,
       evaluator_proposal: salary.replace(/[^0-9]/g, ''),
       year: currentYear,
-      status: 'counter_offer',
+      status: 'submitted',
       updated_at: new Date()
     };
 
@@ -932,7 +932,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         )}
       </AnimatePresence>
 
-      <CounterOfferPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} name={selectedNegotiation?.evaluatee_name} currentProposal={selectedNegotiation?.evaluatee_proposal} onConfirm={(offer, comment) => handleStatusUpdate(selectedNegotiation.id, 'counter_offer', { evaluator_proposal: offer, evaluator_comment: comment })} />
+      <CounterOfferPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} name={selectedNegotiation?.evaluatee_name} currentProposal={selectedNegotiation?.evaluatee_proposal} onConfirm={(offer, comment) => handleStatusUpdate(selectedNegotiation.id, 'submitted', { evaluator_proposal: offer, evaluator_comment: comment })} />
 
       <SalaryNegotiationPopup 
         isOpen={isSalaryPopupOpen} onClose={() => { setIsSalaryPopupOpen(false); setSelectedEmployeeForSalary(null); }}

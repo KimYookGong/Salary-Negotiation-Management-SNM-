@@ -127,7 +127,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       jd: formData.jd,
       evaluatee_proposal: formData.proposal,
       reason: formData.reason,
-      status: 'submitted',
+      status: 'counter_offer',
       updated_at: new Date()
     };
 
