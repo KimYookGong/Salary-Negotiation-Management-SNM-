@@ -11,7 +11,14 @@ if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KE
   console.warn('NOTE: Using fallback Supabase credentials. Make sure .env is correctly loaded.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    storage: window.sessionStorage, // 브라우저 종료(탭 닫기) 시 세션 초기화
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 // 연결 테스트 함수 추가
 export const testSupabaseConnection = async () => {
