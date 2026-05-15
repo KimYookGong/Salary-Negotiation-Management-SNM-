@@ -667,7 +667,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                       onClick={() => handleDeleteNegotiation(selectedNegotiation.id)}
                       className="w-full py-4 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2"
                     >
-                      <X size={18} /> 협상 제안 삭제하기
+                      <X size={18} /> 제안 취소 및 평가 초기화
                     </button>
                   </div>
                 </div>

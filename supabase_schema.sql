@@ -196,46 +196,55 @@ CREATE OR REPLACE FUNCTION sync_final_agreement_to_master()
 RETURNS TRIGGER AS $$
 DECLARE
     target_emp_id TEXT;
+    prev_history RECORD;
 BEGIN
-    -- 상태가 'final_agreement'로 변경된 경우에만 실행
-    IF NEW.status = 'final_agreement' AND (OLD.status IS NULL OR OLD.status <> 'final_agreement') THEN
-        
-        -- employee_id 매핑 (직접 참조 또는 profiles에서 보완)
-        target_emp_id := NEW.employee_id;
-        IF target_emp_id IS NULL THEN
+    -- 1. 최종 합의 상태로의 변경 (INSERT 또는 UPDATE)
+    IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
+        IF NEW.status = 'final_agreement' AND (TG_OP = 'INSERT' OR OLD.status <> 'final_agreement') THEN
             SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
-        END IF;
+            
+            IF target_emp_id IS NOT NULL THEN
+                INSERT INTO employee_history (employee_id, year, position, salary, performance_rating)
+                VALUES (target_emp_id, NEW.year, NEW.position, NEW.evaluator_proposal::BIGINT, NEW.performance_rating)
+                ON CONFLICT (employee_id, year) DO UPDATE SET 
+                    salary = EXCLUDED.salary, performance_rating = EXCLUDED.performance_rating, position = EXCLUDED.position;
 
-        IF target_emp_id IS NOT NULL THEN
-            -- 1. employee_history 업데이트 또는 생성
-            INSERT INTO employee_history (employee_id, year, position, salary, performance_rating)
-            VALUES (
-                target_emp_id, 
-                NEW.year, 
-                NEW.position, 
-                NEW.evaluator_proposal::BIGINT, 
-                NEW.performance_rating
-            )
-            ON CONFLICT (employee_id, year) 
-            DO UPDATE SET 
-                salary = EXCLUDED.salary,
-                performance_rating = EXCLUDED.performance_rating,
-                position = EXCLUDED.position;
-
-            -- 2. profiles 테이블 최신화 (현재 연봉 및 등급)
-            UPDATE profiles
-            SET 
-                current_salary = NEW.evaluator_proposal::BIGINT,
-                performance_rating = NEW.performance_rating,
-                position = NEW.position,
-                updated_at = NOW()
-            WHERE id = NEW.evaluatee_id;
+                UPDATE profiles SET current_salary = NEW.evaluator_proposal::BIGINT, performance_rating = NEW.performance_rating, position = NEW.position, updated_at = NOW()
+                WHERE id = NEW.evaluatee_id;
+            END IF;
         END IF;
     END IF;
-    RETURN NEW;
+
+    -- 2. 제안 취소 또는 삭제 (DELETE 또는 상태가 final_agreement에서 다른 것으로 변경)
+    IF (TG_OP = 'DELETE') OR (TG_OP = 'UPDATE' AND OLD.status = 'final_agreement' AND NEW.status <> 'final_agreement') THEN
+        IF (TG_OP = 'DELETE' AND OLD.status = 'final_agreement') OR (TG_OP = 'UPDATE') THEN
+            -- OLD 데이터를 기준으로 복구 작업 진행
+            SELECT employee_id INTO target_emp_id FROM profiles WHERE id = OLD.evaluatee_id;
+            
+            IF target_emp_id IS NOT NULL THEN
+                -- 해당 연도의 히스토리 삭제
+                DELETE FROM employee_history WHERE employee_id = target_emp_id AND year = OLD.year;
+
+                -- 전년도 데이터 조회하여 프로필 복구
+                SELECT * INTO prev_history FROM employee_history 
+                WHERE employee_id = target_emp_id AND year < OLD.year 
+                ORDER BY year DESC LIMIT 1;
+
+                IF prev_history IS NOT NULL THEN
+                    UPDATE profiles SET current_salary = prev_history.salary, performance_rating = prev_history.performance_rating, position = prev_history.position, updated_at = NOW()
+                    WHERE id = OLD.evaluatee_id;
+                ELSE
+                    UPDATE profiles SET current_salary = 0, performance_rating = '-', updated_at = NOW()
+                    WHERE id = OLD.evaluatee_id;
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+
+    IF (TG_OP = 'DELETE') THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_on_final_agreement
-AFTER UPDATE ON negotiations
+AFTER INSERT OR UPDATE OR DELETE ON negotiations
 FOR EACH ROW EXECUTE FUNCTION sync_final_agreement_to_master();
