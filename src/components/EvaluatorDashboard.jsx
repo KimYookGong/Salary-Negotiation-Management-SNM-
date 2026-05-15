@@ -74,7 +74,7 @@ const calculateTenure = (hireDate) => {
   return `${years}년 ${months}개월`;
 };
 
-const POSITION_SEQUENCE = ['사원', '주임', '대리', '과장', '부장', '차장'];
+const POSITION_SEQUENCE = ['사원', '주임', '대리', '과장', '차장', '부장'];
 
 
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {

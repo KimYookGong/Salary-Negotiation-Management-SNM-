@@ -6,7 +6,7 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-  CREATE TYPE position_type AS ENUM ('사원', '주임', '대리', '과장', '부장', '차장');
+  CREATE TYPE position_type AS ENUM ('사원', '주임', '대리', '과장', '차장', '부장');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
