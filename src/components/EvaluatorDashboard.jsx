@@ -381,6 +381,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   
   const [dbSearchTerm, setDbSearchTerm] = useState('');
   const [dbDeptFilter, setDbDeptFilter] = useState('전체');
+  const [dbPosFilter, setDbPosFilter] = useState('전체');
   const [sortConfig, setSortConfig] = useState({ key: 'full_name', direction: 'asc' });
   const [isSalaryPopupOpen, setIsSalaryPopupOpen] = useState(false);
   const [selectedEmployeeForSalary, setSelectedEmployeeForSalary] = useState(null);
@@ -549,7 +550,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     return employees.filter(emp => {
       const matchSearch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
       const matchDept = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
-      return matchSearch && matchDept;
+      const matchPos = dbPosFilter === '전체' || emp.position === dbPosFilter;
+      return matchSearch && matchDept && matchPos;
     }).sort((a, b) => {
       if (sortConfig.key === 'performance_rating') {
         const ratingOrder = { 'S': 1, 'A': 2, 'B': 3, 'C': 4, 'D': 5 };
@@ -561,7 +563,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [employees, dbSearchTerm, dbDeptFilter, sortConfig]);
+  }, [employees, dbSearchTerm, dbDeptFilter, dbPosFilter, sortConfig]);
 
   const categorizedEmployees = React.useMemo(() => {
     const cats = {
@@ -575,8 +577,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       // 검색 및 부서 필터링 적용
       const searchMatch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
       const deptMatch = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
+      const posMatch = dbPosFilter === '전체' || emp.position === dbPosFilter;
       
-      if (!searchMatch || !deptMatch) return;
+      if (!searchMatch || !deptMatch || !posMatch) return;
 
       const neg = negotiations.find(n => n.employee_id === emp.employee_id || (n.evaluatee_name === emp.full_name && n.department === emp.department));
       
@@ -600,7 +603,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     });
 
     return cats;
-  }, [employees, negotiations, dbSearchTerm, dbDeptFilter]);
+  }, [employees, negotiations, dbSearchTerm, dbDeptFilter, dbPosFilter]);
 
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
   const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
@@ -674,12 +677,21 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               <div className="flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100 shadow-sm">
                 <Filter size={16} className="text-gray-400" />
                 <select 
-                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
                   value={dbDeptFilter} 
                   onChange={(e) => setDbDeptFilter(e.target.value)}
                 >
                   <option value="전체">전체 부서</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+                <select 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
+                  value={dbPosFilter} 
+                  onChange={(e) => setDbPosFilter(e.target.value)}
+                >
+                  <option value="전체">전체 직급</option>
+                  {POSITION_SEQUENCE.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
               <div className="relative group">
@@ -747,12 +759,21 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
                 <Filter size={16} className="text-gray-400" />
                 <select 
-                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
                   value={dbDeptFilter} 
                   onChange={(e) => setDbDeptFilter(e.target.value)}
                 >
                   <option value="전체">전체 부서</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <div className="w-[1px] h-4 bg-gray-100 mx-1" />
+                <select 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
+                  value={dbPosFilter} 
+                  onChange={(e) => setDbPosFilter(e.target.value)}
+                >
+                  <option value="전체">전체 직급</option>
+                  {POSITION_SEQUENCE.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>
             </div>
