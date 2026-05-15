@@ -329,6 +329,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [selectedNegotiation, setSelectedNegotiation] = useState(null);
+  const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -611,6 +612,71 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         </div>
       )}
 
+      {currentTab === 'employees' && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
+            <div>
+              <h3 className="text-xl font-black text-[var(--color-primary)] mb-1">전체 사원 현황 및 이력</h3>
+              <p className="text-xs text-gray-400 font-medium">사원을 클릭하여 상세 연봉 및 고과 히스토리를 확인하세요.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
+                <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50/50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">성명</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">부서 / 직급</th>
+                  <th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">입사일</th>
+                  <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 연봉</th>
+                  <th className="px-8 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 등급</th>
+                  <th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 이력</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {filteredEmployees.map((emp) => (
+                  <tr key={emp.employee_id} className="hover:bg-gray-50/50 cursor-pointer group" onClick={() => setSelectedEmployeeForHistory(emp)}>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center group-hover:bg-[var(--color-secondary)] group-hover:text-white transition-colors">
+                          <User size={20} />
+                        </div>
+                        <p className="text-sm font-black text-gray-900">{emp.full_name}</p>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <p className="text-sm font-bold text-gray-600">{emp.department}</p>
+                      <p className="text-[10px] text-gray-400 font-bold">{emp.position}</p>
+                    </td>
+                    <td className="px-8 py-5 text-sm font-medium text-gray-500">{emp.hire_date || '-'}</td>
+                    <td className="px-8 py-5 text-right text-sm font-black text-gray-900">{formatCurrency(emp.current_salary)}</td>
+                    <td className="px-8 py-5 text-center">
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-black ${
+                        emp.performance_rating === 'S' ? 'bg-purple-100 text-purple-700' :
+                        emp.performance_rating === 'A' ? 'bg-blue-100 text-blue-700' :
+                        emp.performance_rating === 'B' ? 'bg-green-100 text-green-700' :
+                        emp.performance_rating === 'C' ? 'bg-orange-100 text-orange-700' :
+                        emp.performance_rating === 'D' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
+                      }`}>{emp.performance_rating || '-'}</span>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <div className="inline-flex p-1.5 rounded-lg text-gray-200 group-hover:bg-[var(--color-secondary)] group-hover:text-white transition-colors">
+                        <ChevronRight size={18} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
+
       {currentTab === 'negotiation' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
@@ -670,6 +736,83 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                       <X size={18} /> 제안 취소 및 평가 초기화
                     </button>
                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedEmployeeForHistory && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/20 z-40" onClick={() => setSelectedEmployeeForHistory(null)} />
+            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed right-0 top-0 h-full w-[600px] bg-white shadow-2xl z-50 overflow-y-auto">
+              <div className="p-10">
+                <div className="flex justify-between items-start mb-10">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300">
+                      <User size={32} />
+                    </div>
+                    <div>
+                      <h2 className="text-3xl font-black text-gray-900">{selectedEmployeeForHistory.full_name}</h2>
+                      <p className="text-sm font-bold text-gray-500 mt-1">{selectedEmployeeForHistory.department} {selectedEmployeeForHistory.position}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setSelectedEmployeeForHistory(null)} className="p-2 hover:bg-gray-50 rounded-xl">
+                    <X size={24} className="text-gray-400" />
+                  </button>
+                </div>
+
+                <div className="space-y-8">
+                  <section>
+                    <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <TrendingUp size={14} /> 연도별 인사 히스토리
+                    </h4>
+                    <div className="relative border-l-2 border-gray-100 ml-4 pl-8 space-y-10">
+                      {[...selectedEmployeeForHistory.employee_history].sort((a,b) => b.year - a.year).map((h, idx, arr) => {
+                        const prevYearData = arr[idx + 1];
+                        let increaseRate = 0;
+                        if (prevYearData && prevYearData.salary > 0) {
+                          increaseRate = ((h.salary - prevYearData.salary) / prevYearData.salary) * 100;
+                        }
+                        
+                        return (
+                          <div key={h.year} className="relative">
+                            <div className="absolute -left-[41px] top-0 w-5 h-5 bg-white border-4 border-[var(--color-secondary)] rounded-full shadow-sm" />
+                            <div className="bg-gray-50/50 p-6 rounded-3xl border border-gray-100 group hover:border-[var(--color-secondary)] transition-colors">
+                              <div className="flex items-center justify-between mb-4">
+                                <span className="text-lg font-black text-[var(--color-primary)]">{h.year}년</span>
+                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                  h.performance_rating === 'S' ? 'bg-purple-100 text-purple-700' :
+                                  h.performance_rating === 'A' ? 'bg-blue-100 text-blue-700' :
+                                  h.performance_rating === 'B' ? 'bg-green-100 text-green-700' :
+                                  h.performance_rating === 'C' ? 'bg-orange-100 text-orange-700' :
+                                  h.performance_rating === 'D' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-400'
+                                }`}>성과등급: {h.performance_rating}</span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase">연봉</p>
+                                  <p className="text-base font-black text-gray-900">{formatCurrency(h.salary)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase">인상률</p>
+                                  <p className={`text-base font-black ${increaseRate > 0 ? 'text-red-500' : 'text-gray-900'}`}>
+                                    {increaseRate > 0 ? `+${increaseRate.toFixed(1)}%` : '0%'}
+                                  </p>
+                                </div>
+                                <div className="col-span-2 pt-2 border-t border-gray-100 mt-2">
+                                  <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase">발령 정보</p>
+                                  <p className="text-sm font-bold text-gray-700">{h.position} 발령</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
                 </div>
               </div>
             </motion.div>

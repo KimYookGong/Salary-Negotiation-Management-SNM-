@@ -11,7 +11,8 @@ import {
   ChevronRight,
   TrendingUp,
   RefreshCw,
-  Calendar
+  Calendar,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -37,6 +38,7 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
 
   const menuItems = [
     { id: 'dashboard', label: '대시보드', icon: LayoutDashboard },
+    { id: 'employees', label: '사원 현황', icon: Users },
     { id: 'negotiation', label: userRole === 'evaluator' ? '협상 관리' : '연봉 협상', icon: MessageSquare },
   ];
 

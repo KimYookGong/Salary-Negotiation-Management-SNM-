@@ -165,7 +165,7 @@ function App() {
     }
     if (!userRole) return null;
 
-    if (currentTab === 'dashboard' || currentTab === 'negotiation') {
+    if (currentTab === 'dashboard' || currentTab === 'negotiation' || currentTab === 'employees') {
       return userRole === 'evaluator' 
         ? <EvaluatorDashboard profile={profile} currentTab={currentTab} currentYear={currentYear} /> 
         : <EvaluateeDashboard profile={profile} currentYear={currentYear} />;
