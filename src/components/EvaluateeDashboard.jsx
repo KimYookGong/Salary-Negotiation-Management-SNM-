@@ -29,10 +29,7 @@ const StatusBadge = ({ status }) => {
 const formatCurrency = (value) => {
   if (!value && value !== 0) return '-';
   const num = Number(value);
-  if (num >= 100000000) {
-    return (num / 100000000).toFixed(1) + '억';
-  }
-  return (num / 10000).toLocaleString() + '만원';
+  return num.toLocaleString() + '원';
 };
 
 // 근속연수 계산기

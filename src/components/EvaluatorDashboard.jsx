@@ -37,17 +37,14 @@ const statusMap = {
 const formatCurrency = (value) => {
   if (!value && value !== 0) return '-';
   const num = Number(value);
-  if (num >= 100000000) {
-    return (num / 100000000).toFixed(1) + '억';
-  }
-  return (num / 10000).toLocaleString() + '만원';
+  return num.toLocaleString() + '원';
 };
 
 // 단순 만원 포맷터 (예산 현황용)
 const formatCurrencySimple = (value) => {
   if (!value && value !== 0) return '0원';
   const num = Number(value);
-  return (num / 10000).toLocaleString() + '만원';
+  return num.toLocaleString() + '원';
 };
 
 // 입력용 천단위 구분기호 포맷터
@@ -549,7 +546,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
                 <div className="flex items-center gap-8">
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">총 인상 예산</p>
+                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">총예산</p>
                     <p className="text-xl font-black text-gray-900 leading-tight">{formatCurrencySimple(currentBudgetContext.limit)}</p>
                   </div>
                   <div className="w-[1px] h-6 bg-gray-100" />
