@@ -47,17 +47,16 @@ const formatCurrencySimple = (value) => {
   return num.toLocaleString() + '원';
 };
 
-// 입력용 천단위 구분기호 포맷터
+// 입력용 천단위 구분기호 포맷터 (순수 숫자만 반환/포맷)
 const formatInputCurrency = (value) => {
-  if (!value) return '';
+  if (!value && value !== 0) return '';
   const num = value.toString().replace(/[^0-9]/g, '');
   if (!num) return '';
-  return Number(num).toLocaleString() + '원';
+  return Number(num).toLocaleString();
 };
 
 
 
-// 근속연수 계산기
 const calculateTenure = (hireDate) => {
   if (!hireDate) return '-';
   const joinDate = new Date(hireDate);
@@ -74,6 +73,8 @@ const calculateTenure = (hireDate) => {
   if (years === 0) return `${months}개월`;
   return `${years}년 ${months}개월`;
 };
+
+const POSITION_SEQUENCE = ['사원', '대리', '과장', '차장', '부장'];
 
 
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
@@ -172,6 +173,28 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
   const [proposedRating, setProposedRating] = useState(employee?.performance_rating || 'A');
   const [proposedSalary, setProposedSalary] = useState('');
   const [increaseRate, setIncreaseRate] = useState(0);
+  const [isPromoted, setIsPromoted] = useState(false);
+  const [proposedPosition, setProposedPosition] = useState(employee?.position || '');
+
+  useEffect(() => {
+    if (employee) {
+      setProposedRating(employee.performance_rating || 'A');
+      setProposedPosition(employee.position || '');
+      setIsPromoted(false);
+      setProposedSalary('');
+    }
+  }, [employee, isOpen]);
+
+  useEffect(() => {
+    if (isPromoted) {
+      const currentIdx = POSITION_SEQUENCE.indexOf(employee?.position);
+      if (currentIdx !== -1 && currentIdx < POSITION_SEQUENCE.length - 1) {
+        setProposedPosition(POSITION_SEQUENCE[currentIdx + 1]);
+      }
+    } else {
+      setProposedPosition(employee?.position || '');
+    }
+  }, [isPromoted, employee]);
 
   useEffect(() => {
     if (employee && employee.current_salary && proposedSalary) {
@@ -234,21 +257,26 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
             </div>
 
             {/* Budget Impact Alert */}
-            <div className="mt-8 p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-3">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-gray-500">전체 예산 사용률</span>
-                  <span className={`text-xs font-black ${totalUsage > 100 ? 'text-red-600' : 'text-gray-900'}`}>{totalUsage}%</span>
+            <div className="mt-8 p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-end">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">전체 예산 사용률</span>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-gray-900">{totalUsage}% <span className="text-[10px] text-gray-400 font-bold">사용 중</span></p>
+                  </div>
                 </div>
-                <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                  <div className={`h-full ${totalUsage > 100 ? 'bg-red-500' : 'bg-[var(--color-primary)]'} transition-all`} style={{ width: `${Math.min(totalUsage, 100)}%` }} />
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                  <div className={`h-full ${totalUsage > 100 ? 'bg-red-500' : 'bg-[var(--color-primary)]'} transition-all duration-500 ease-out`} style={{ width: `${Math.min(totalUsage, 100)}%` }} />
                 </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-xs font-bold text-gray-500">부서 예산 사용률</span>
-                  <span className={`text-xs font-black ${deptUsage > 100 ? 'text-red-600' : 'text-gray-900'}`}>{deptUsage}%</span>
+                
+                <div className="flex justify-between items-end pt-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">부서 예산 사용률</span>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-gray-900">{deptUsage}% <span className="text-[10px] text-gray-400 font-bold">사용 중</span></p>
+                  </div>
                 </div>
-                <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-                  <div className={`h-full ${deptUsage > 100 ? 'bg-red-500' : 'bg-[var(--color-secondary)]'} transition-all`} style={{ width: `${Math.min(deptUsage, 100)}%` }} />
+                <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                  <div className={`h-full ${deptUsage > 100 ? 'bg-red-500' : 'bg-[var(--color-secondary)]'} transition-all duration-500 ease-out`} style={{ width: `${Math.min(deptUsage, 100)}%` }} />
                 </div>
               </div>
               { (totalUsage > 100 || deptUsage > 100) && (
@@ -262,13 +290,14 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
 
           <div className="space-y-6">
             <div className="space-y-5">
-              <div>
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">평가 등급</p>
                 <div className="flex gap-2">
                   {['S', 'A', 'B', 'C', 'D'].map(r => (
                     <button 
                       key={r} onClick={() => setProposedRating(r)}
                       className={`flex-1 py-2 rounded-xl text-xs font-black border transition-all ${
-                        proposedRating === r ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]' : 'bg-gray-50 text-gray-400 border-gray-100'
+                        proposedRating === r ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-lg shadow-primary/20' : 'bg-gray-50 text-gray-400 border-gray-100'
                       }`}
                     >
                       {r}
@@ -276,20 +305,46 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
                   ))}
                 </div>
               </div>
-              <div>
-                <input 
-                  type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
-                  placeholder="제안 연봉 (예: 50,000,000원)" 
-                  value={formatInputCurrency(proposedSalary)} 
-                  onChange={(e) => {
-                    const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                    setProposedSalary(rawValue);
-                  }}
-                />
+
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">승진 여부</p>
+                <button 
+                  onClick={() => setIsPromoted(!isPromoted)}
+                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between ${
+                    isPromoted ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/5' : 'border-gray-100 bg-gray-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${isPromoted ? 'bg-[var(--color-secondary)] text-white' : 'bg-white text-gray-200'}`}>
+                      <Check size={14} strokeWidth={4} />
+                    </div>
+                    <span className={`text-sm font-black ${isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>당해 연도 승진 대상</span>
+                  </div>
+                  {isPromoted && <span className="text-xs font-black text-[var(--color-secondary)]">{employee.position} → {proposedPosition}</span>}
+                </button>
               </div>
-              <div className="p-4 bg-[var(--color-primary)]/5 rounded-2xl border border-[var(--color-primary)]/10 flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-600">인상률</span>
-                <span className="text-lg font-black text-[var(--color-primary)]">{increaseRate}%</span>
+
+              <div className="space-y-3">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">제안 연봉</p>
+                <div className="relative group">
+                  <input 
+                    type="text" className="w-full p-4 pr-12 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-lg font-black text-[var(--color-primary)] shadow-sm"
+                    placeholder="50,000,000" 
+                    value={formatInputCurrency(proposedSalary)} 
+                    onChange={(e) => {
+                      const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                      setProposedSalary(rawValue);
+                    }}
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-black text-gray-300 group-focus-within:text-[var(--color-primary)]">원</span>
+                </div>
+              </div>
+
+              <div className="p-5 bg-[var(--color-primary)]/5 rounded-2xl border border-[var(--color-primary)]/10 flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-600">현재 대비 인상률</span>
+                <span className={`text-xl font-black ${Number(increaseRate) > 0 ? 'text-red-500' : 'text-[var(--color-primary)]'}`}>
+                  {Number(increaseRate) > 0 ? `+${increaseRate}%` : `${increaseRate}%`}
+                </span>
               </div>
             </div>
           </div>
@@ -300,7 +355,7 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
           <button 
             disabled={totalUsage > 100 || deptUsage > 100}
             onClick={() => {
-              onConfirm(proposedRating, proposedSalary, increaseRate);
+              onConfirm(proposedRating, proposedSalary, increaseRate, { isPromoted, position: proposedPosition });
             }}
             className={`flex-2 py-4 px-8 text-white text-base font-black rounded-2xl shadow-xl transition-all ${
               (totalUsage > 100 || deptUsage > 100) ? 'bg-gray-300 cursor-not-allowed shadow-none' : 'bg-[var(--color-primary)] shadow-primary/20 hover:scale-[1.02] active:scale-[0.98]'
@@ -443,7 +498,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     }
   };
 
-  const handleSalaryProposal = async (rating, salary, rate) => {
+  const handleSalaryProposal = async (rating, salary, rate, promotionData = {}) => {
     if (!selectedEmployeeForSalary) return;
     
     const { data: userProfile } = await supabase.from('profiles').select('id').eq('employee_id', selectedEmployeeForSalary.employee_id).single();
@@ -451,7 +506,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       employee_id: selectedEmployeeForSalary.employee_id, // 사번 추가
       evaluatee_name: selectedEmployeeForSalary.full_name,
       department: selectedEmployeeForSalary.department,
-      position: selectedEmployeeForSalary.position,
+      position: promotionData.position || selectedEmployeeForSalary.position,
       current_salary: selectedEmployeeForSalary.current_salary,
       performance_rating: rating,
       evaluator_proposal: salary.replace(/[^0-9]/g, ''),
