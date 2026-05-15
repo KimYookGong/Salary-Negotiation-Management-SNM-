@@ -99,7 +99,7 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
                 value={currentYear}
                 onChange={(e) => setCurrentYear(Number(e.target.value))}
               >
-                {[2022, 2023, 2024, 2025, 2026, 2027].map(y => (
+                {Array.from({ length: new Date().getFullYear() - 2024 + 1 }, (_, i) => 2024 + i).map(y => (
                   <option key={y} value={y}>{y}년</option>
                 ))}
               </select>

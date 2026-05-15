@@ -11,7 +11,7 @@ function App() {
   const [userRole, setUserRole] = useState(null);
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
-  const [currentYear, setCurrentYear] = useState(2026); // 연도 전역 상태 추가
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear()); // 현재 연도 자동 설정
   const isInitializing = useRef(false); // 중복 초기화 방지용
 
   const fetchProfile = async (userId) => {
