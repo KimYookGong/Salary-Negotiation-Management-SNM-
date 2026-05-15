@@ -118,6 +118,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
     const payload = {
       evaluatee_id: profile.id,
+      employee_id: profile.employee_id, // 사번 추가
       evaluatee_name: profile.full_name,
       department: profile.department,
       position: profile.position,

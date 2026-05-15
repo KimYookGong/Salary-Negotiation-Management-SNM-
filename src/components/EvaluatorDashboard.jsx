@@ -447,6 +447,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     
     const { data: userProfile } = await supabase.from('profiles').select('id').eq('employee_id', selectedEmployeeForSalary.employee_id).single();
     const payload = {
+      employee_id: selectedEmployeeForSalary.employee_id, // 사번 추가
       evaluatee_name: selectedEmployeeForSalary.full_name,
       department: selectedEmployeeForSalary.department,
       position: selectedEmployeeForSalary.position,

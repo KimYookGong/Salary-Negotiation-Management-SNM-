@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS employee_history (
 CREATE TABLE IF NOT EXISTS negotiations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   evaluatee_id UUID REFERENCES auth.users(id),
+  employee_id TEXT REFERENCES employees(employee_id), -- 사번 컬럼 추가
   evaluatee_name TEXT NOT NULL,
   department department_type NOT NULL,
   position position_type,
@@ -199,8 +200,11 @@ BEGIN
     -- 상태가 'final_agreement'로 변경된 경우에만 실행
     IF NEW.status = 'final_agreement' AND (OLD.status IS NULL OR OLD.status <> 'final_agreement') THEN
         
-        -- employee_id 매핑 (profiles 테이블에서 조회)
-        SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
+        -- employee_id 매핑 (직접 참조 또는 profiles에서 보완)
+        target_emp_id := NEW.employee_id;
+        IF target_emp_id IS NULL THEN
+            SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
+        END IF;
 
         IF target_emp_id IS NOT NULL THEN
             -- 1. employee_history 업데이트 또는 생성
