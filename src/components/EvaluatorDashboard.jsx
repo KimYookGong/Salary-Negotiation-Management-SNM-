@@ -25,12 +25,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 // 상태 한글화 맵핑
 const statusMap = {
-  submitted: { label: '대기중', className: 'bg-orange-100 text-orange-700' },
-  under_review: { label: '검토중', className: 'bg-blue-100 text-blue-700' },
-  counter_offer: { label: '제시중', className: 'bg-purple-100 text-purple-700' },
-  final_agreement: { label: '최종 합의', className: 'bg-green-100 text-green-700', icon: CheckCircle },
-  rejected: { label: '거절됨', className: 'bg-red-100 text-red-600', icon: AlertCircle },
-  cancelled: { label: '취소됨', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
+  submitted: { label: '제안중', className: 'bg-blue-100 text-blue-700' },
+  under_review: { label: '제안중', className: 'bg-blue-100 text-blue-700' },
+  counter_offer: { label: '역제안중', className: 'bg-purple-100 text-purple-700' },
+  final_agreement: { label: '협상 완료', className: 'bg-green-100 text-green-700', icon: CheckCircle },
+  rejected: { label: '미제안', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
+  cancelled: { label: '미제안', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
 };
 
 // 금액 포맷터
@@ -486,20 +486,44 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     setSortConfig({ key, direction });
   };
 
-  const filteredEmployees = employees.filter(emp => {
-    const matchSearch = emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
-    const matchDept = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
-    return matchSearch && matchDept;
-  }).sort((a, b) => {
-    if (sortConfig.key === 'performance_rating') {
-      const ratingOrder = { 'S': 1, 'A': 2, 'B': 3, 'C': 4, 'D': 5 };
-      const valA = ratingOrder[a[sortConfig.key]] || 99; const valB = ratingOrder[b[sortConfig.key]] || 99;
-      return sortConfig.direction === 'asc' ? valA - valB : valB - valA;
-    }
-    if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
-  });
+  const categorizedEmployees = React.useMemo(() => {
+    const cats = {
+      not_proposed: [],
+      proposed: [],
+      countering: [],
+      finalized: []
+    };
+
+    employees.forEach(emp => {
+      // 검색 및 부서 필터링 적용
+      const searchMatch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
+      const deptMatch = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
+      
+      if (!searchMatch || !deptMatch) return;
+
+      const neg = negotiations.find(n => n.employee_id === emp.employee_id || (n.evaluatee_name === emp.full_name && n.department === emp.department));
+      
+      const baseInfo = {
+        id: emp.employee_id,
+        name: emp.full_name,
+        dept: emp.department,
+        pos: emp.position,
+        salary: emp.current_salary
+      };
+
+      if (!neg || neg.status === 'rejected' || neg.status === 'cancelled') {
+        cats.not_proposed.push({ ...baseInfo, type: 'employee', data: emp });
+      } else if (neg.status === 'submitted' || neg.status === 'under_review') {
+        cats.proposed.push({ ...baseInfo, type: 'negotiation', data: neg, proposal: neg.evaluator_proposal });
+      } else if (neg.status === 'counter_offer') {
+        cats.countering.push({ ...baseInfo, type: 'negotiation', data: neg, proposal: neg.evaluator_proposal });
+      } else if (neg.status === 'final_agreement') {
+        cats.finalized.push({ ...baseInfo, type: 'negotiation', data: neg, proposal: neg.evaluator_proposal });
+      }
+    });
+
+    return cats;
+  }, [employees, negotiations, dbSearchTerm, dbDeptFilter]);
 
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
   const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
@@ -543,74 +567,24 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
             <h3 className="text-xl font-black text-[var(--color-primary)] px-2 flex items-center gap-2">
               <Wallet size={20} /> 예산 현황
             </h3>
-            <div className="bg-white p-4 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-8">
-              <div className="flex items-center gap-6">
-                <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
-                <div className="flex items-center gap-8">
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">총예산</p>
-                    <p className="text-xl font-black text-gray-900 leading-tight">{formatCurrencySimple(currentBudgetContext.limit)}</p>
-                  </div>
-                  <div className="w-[1px] h-6 bg-gray-100" />
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 mb-1 uppercase tracking-tight">현재 사용액</p>
-                    <p className="text-xl font-black text-[var(--color-primary)] leading-tight">{formatCurrencySimple(currentBudgetContext.used)}</p>
-                  </div>
+            <div className="bg-white p-8 rounded-[40px] shadow-sm border border-gray-100 flex items-center gap-16">
+              <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
+              <div className="flex items-center gap-16">
+                <div>
+                  <p className="text-[11px] font-black text-gray-400 mb-2 uppercase tracking-widest">배정 총예산</p>
+                  <p className="text-3xl font-black text-gray-900">{formatCurrencySimple(currentBudgetContext.limit)}</p>
+                </div>
+                <div className="w-[1px] h-12 bg-gray-100" />
+                <div>
+                  <p className="text-[11px] font-black text-gray-400 mb-2 uppercase tracking-widest">현재 사용액</p>
+                  <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrencySimple(currentBudgetContext.used)}</p>
                 </div>
               </div>
             </div>
           </div>
-
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0 bg-gray-50/30">
-              <h3 className="text-lg font-black text-[var(--color-primary)] flex items-center gap-2"><Users size={20} /> 사원 현황</h3>
-              <div className="flex items-center gap-4">
-                <div className="relative group">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={16} />
-                  <input type="text" placeholder="성명 검색..." className="pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl outline-none w-56 text-xs font-medium shadow-sm" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('full_name')}>성명</th>
-                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('department')}>부서</th>
-                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('position')}>직급</th>
-                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('hire_date')}>입사일</th>
-                    <th className="px-8 py-5 text-left text-[11px] font-black text-gray-400 uppercase tracking-widest">근속연수</th>
-                    <th className="px-8 py-5 text-right text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('current_salary')}>현재 연봉</th>
-                    <th className="px-8 py-5 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest cursor-pointer" onClick={() => handleSort('performance_rating')}>평가 등급</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {filteredEmployees.map((emp) => (
-                    <tr key={emp.employee_id} className="hover:bg-gray-50/50 cursor-pointer" onClick={() => { setSelectedEmployeeForSalary(emp); setIsSalaryPopupOpen(true); }}>
-                      <td className="px-8 py-5"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center"><User size={20} /></div><p className="text-sm font-black text-gray-900">{emp.full_name}</p></div></td>
-                      <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.department}</td>
-                       <td className="px-8 py-5 text-sm font-bold text-gray-600">{emp.position}</td>
-                      <td className="px-8 py-5 text-sm font-medium text-gray-500">{emp.hire_date || '-'}</td>
-                      <td className="px-8 py-5 text-sm font-black text-[var(--color-primary)]">{calculateTenure(emp.hire_date)}</td>
-                      <td className="px-8 py-5 text-right text-sm font-black text-gray-900">{formatCurrency(emp.current_salary)}</td>
-                      <td className="px-8 py-5 text-center">
-                        <span className={`inline-block px-3 py-1 rounded-lg text-xs font-black border ${
-                          emp.performance_rating === 'S' ? 'bg-purple-50 text-purple-600 border-purple-100' :
-                          emp.performance_rating === 'A' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                          emp.performance_rating === 'B' ? 'bg-green-50 text-green-600 border-green-100' :
-                          emp.performance_rating === 'C' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                          emp.performance_rating === 'D' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-gray-50 text-gray-400 border-gray-100'
-                        }`}>{emp.performance_rating || '-'}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </motion.div>
         </div>
       )}
+
 
       {currentTab === 'employees' && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
@@ -678,36 +652,86 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       )}
 
       {currentTab === 'negotiation' && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-6 shrink-0">
-            <div>
-              <h3 className="text-xl font-black text-[var(--color-primary)] mb-1">협상 프로세스 관리</h3>
+        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+          <div className="flex items-center justify-between shrink-0 px-2">
+            <div className="flex items-center gap-4">
+              <h3 className="text-xl font-black text-[var(--color-primary)]">협상 관리 프로세스</h3>
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
+                <Filter size={16} className="text-gray-400" />
+                <select 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                  value={dbDeptFilter} 
+                  onChange={(e) => setDbDeptFilter(e.target.value)}
+                >
+                  <option value="전체">전체 부서</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
             </div>
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
-              <input type="text" placeholder="대상자 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl w-64 text-sm font-medium shadow-sm outline-none" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50/50 sticky top-0 z-10">
-                <tr><th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">대상자 정보</th><th className="px-8 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">평가등급</th><th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 진행 상태</th><th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">희망 연봉 및 조건</th><th className="px-8 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">최종 업데이트</th><th className="px-8 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 보기</th></tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredNegotiations.map((neg) => (
-                  <tr key={neg.id} className="hover:bg-gray-50/50 cursor-pointer group" onClick={() => setSelectedNegotiation(neg)}>
-                    <td className="px-8 py-5"><div className="flex items-center gap-4"><div className="w-10 h-10 rounded-xl bg-gray-50 text-gray-300 flex items-center justify-center group-hover:bg-[var(--color-primary)] group-hover:text-white"><User size={20} /></div><div><p className="text-sm font-black text-gray-900">{neg.evaluatee_name}</p><p className="text-[10px] text-gray-400 font-bold">{neg.department} {neg.position}</p></div></div></td>
-                    <td className="px-8 py-5 text-center">{neg.performance_rating ? <span className="text-xs font-black text-[var(--color-primary)] bg-[var(--color-primary)]/5 px-3 py-1 rounded-lg border border-[var(--color-primary)]/10">{neg.performance_rating}</span> : '-'}</td>
-                    <td className="px-8 py-5"><span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black ${statusMap[neg.status]?.className}`}>{statusMap[neg.status]?.label}</span></td>
-                    <td className="px-8 py-5 font-black text-sm text-[var(--color-primary)]">{neg.evaluatee_proposal}</td>
-                    <td className="px-8 py-5 text-[10px] text-gray-400 font-bold">{new Date(neg.updated_at).toLocaleDateString()}</td>
-                    <td className="px-8 py-5 text-right"><div className="inline-flex p-1.5 rounded-lg text-gray-200 group-hover:bg-[var(--color-primary)] group-hover:text-white"><ChevronRight size={18} /></div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="flex-1 flex gap-6 overflow-x-auto pb-4 custom-scrollbar">
+            {[
+              { id: 'not_proposed', label: '미제안', color: 'bg-gray-400' },
+              { id: 'proposed', label: '제안중', color: 'bg-blue-500' },
+              { id: 'countering', label: '역제안중', color: 'bg-purple-500' },
+              { id: 'finalized', label: '협상 완료', color: 'bg-green-500' }
+            ].map(column => (
+              <div key={column.id} className="flex-1 min-w-[320px] flex flex-col bg-gray-50/30 rounded-[32px] border border-gray-100 overflow-hidden shadow-sm">
+                <div className="p-5 border-b border-gray-100 bg-white flex items-center justify-between">
+                  <span className="text-sm font-black text-gray-900 flex items-center gap-2">
+                    <div className={`w-2.5 h-2.5 rounded-full ${column.color} shadow-sm`} />
+                    {column.label}
+                  </span>
+                  <span className="text-[10px] font-black text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
+                    {categorizedEmployees[column.id].length}
+                  </span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {categorizedEmployees[column.id].map(item => (
+                    <motion.div 
+                      key={item.id} 
+                      whileHover={{ y: -4, shadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                      onClick={() => item.type === 'employee' ? (setSelectedEmployeeForSalary(item.data), setIsSalaryPopupOpen(true)) : setSelectedNegotiation(item.data)}
+                      className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm cursor-pointer hover:border-[var(--color-primary)] transition-all"
+                    >
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-300">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-gray-900">{item.name}</p>
+                          <p className="text-[10px] text-gray-400 font-bold">{item.dept} {item.pos}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-50">
+                        <div>
+                          <p className="text-[9px] font-black text-gray-300 uppercase mb-0.5">현재 연봉</p>
+                          <p className="text-[11px] font-black text-gray-500">{formatCurrencySimple(item.salary)}</p>
+                        </div>
+                        {item.proposal ? (
+                          <div className="text-right">
+                            <p className="text-[9px] font-black text-[var(--color-primary)]/40 uppercase mb-0.5">인사팀 제안</p>
+                            <p className="text-[11px] font-black text-[var(--color-primary)]">{formatCurrencySimple(item.proposal)}</p>
+                          </div>
+                        ) : (
+                          <div className="text-right">
+                             <p className="text-[9px] font-black text-gray-300 uppercase mb-0.5">상태</p>
+                             <p className="text-[10px] font-black text-gray-400 italic">제안 대기</p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-        </motion.div>
+        </div>
       )}
 
       <AnimatePresence>

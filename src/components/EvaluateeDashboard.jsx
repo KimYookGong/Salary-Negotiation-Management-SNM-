@@ -6,12 +6,12 @@ import { supabase } from '../supabaseClient';
 
 const StatusBadge = ({ status }) => {
   const configs = {
-    submitted: { label: '제출 완료', className: 'badge-submitted', icon: CheckCircle },
-    under_review: { label: '검토 중', className: 'badge-review', icon: Clock },
-    counter_offer: { label: '역제시 수신', className: 'badge-counter', icon: AlertCircle },
-    final_agreement: { label: '최종 합의', className: 'badge-final', icon: CheckCircle },
-    rejected: { label: '거절됨', className: 'bg-red-100 text-red-600', icon: AlertCircle },
-    cancelled: { label: '취소됨', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
+    submitted: { label: '제안중', className: 'badge-submitted', icon: CheckCircle },
+    under_review: { label: '제안중', className: 'badge-review', icon: Clock },
+    counter_offer: { label: '역제안중', className: 'badge-counter', icon: AlertCircle },
+    final_agreement: { label: '협상 완료', className: 'badge-final', icon: CheckCircle },
+    rejected: { label: '미제안', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
+    cancelled: { label: '미제안', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
   };
 
   const config = configs[status] || configs.submitted;
