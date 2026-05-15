@@ -345,29 +345,37 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       if (negsError) throw negsError;
       if (negs) setNegotiations(negs);
 
-      // 사원 및 히스토리 조회 (현재 연도 데이터 조인)
+      // 사원 및 히스토리 조회 (현재 연도 및 전년도 데이터 조인)
       const { data: emps, error: empsError } = await supabase
         .from('employees')
         .select(`
           *,
           employee_history (
+            year,
             position,
             salary,
             performance_rating
           )
-        `)
-        .eq('employee_history.year', currentYear);
+        `);
+        // .eq('employee_history.year', currentYear); // 특정 연도 필터 대신 전체/범위 조회 후 JS에서 처리
 
       if (empsError) throw empsError;
       
-      // 데이터 평탄화 (히스토리 정보를 사원 객체에 병합)
+      // 데이터 평탄화 (현재 연도 데이터 우선, 없으면 전년도 데이터 사용)
       const flattenedEmps = emps?.map(emp => {
-        const history = emp.employee_history?.[0] || {};
+        const histories = emp.employee_history || [];
+        // 1순위: 현재 선택된 연도 데이터
+        const currentHist = histories.find(h => h.year === currentYear);
+        // 2순위: 전년도 데이터
+        const prevHist = histories.find(h => h.year === currentYear - 1);
+        
+        const activeHist = currentHist || prevHist || {};
+
         return {
           ...emp,
-          position: history.position || emp.position, // 기본값 유지
-          current_salary: history.salary || 0,
-          performance_rating: history.performance_rating || '-'
+          position: activeHist.position || emp.position,
+          current_salary: activeHist.salary || 0,
+          performance_rating: activeHist.performance_rating || '-'
         };
       }) || [];
       

@@ -189,3 +189,49 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_sync_negotiation_budget
 AFTER INSERT OR UPDATE OR DELETE ON negotiations
 FOR EACH ROW EXECUTE FUNCTION sync_negotiation_budget_auto();
+
+-- 9. 트리거 함수: 협상 타결 시 사원 히스토리 및 프로필 자동 업데이트
+CREATE OR REPLACE FUNCTION sync_final_agreement_to_master()
+RETURNS TRIGGER AS $$
+DECLARE
+    target_emp_id TEXT;
+BEGIN
+    -- 상태가 'final_agreement'로 변경된 경우에만 실행
+    IF NEW.status = 'final_agreement' AND (OLD.status IS NULL OR OLD.status <> 'final_agreement') THEN
+        
+        -- employee_id 매핑 (profiles 테이블에서 조회)
+        SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
+
+        IF target_emp_id IS NOT NULL THEN
+            -- 1. employee_history 업데이트 또는 생성
+            INSERT INTO employee_history (employee_id, year, position, salary, performance_rating)
+            VALUES (
+                target_emp_id, 
+                NEW.year, 
+                NEW.position, 
+                NEW.evaluator_proposal::BIGINT, 
+                NEW.performance_rating
+            )
+            ON CONFLICT (employee_id, year) 
+            DO UPDATE SET 
+                salary = EXCLUDED.salary,
+                performance_rating = EXCLUDED.performance_rating,
+                position = EXCLUDED.position;
+
+            -- 2. profiles 테이블 최신화 (현재 연봉 및 등급)
+            UPDATE profiles
+            SET 
+                current_salary = NEW.evaluator_proposal::BIGINT,
+                performance_rating = NEW.performance_rating,
+                position = NEW.position,
+                updated_at = NOW()
+            WHERE id = NEW.evaluatee_id;
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_on_final_agreement
+AFTER UPDATE ON negotiations
+FOR EACH ROW EXECUTE FUNCTION sync_final_agreement_to_master();
