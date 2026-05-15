@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { 
   MessageSquare, 
   Check, 
+  CheckCircle,
   Search, 
   ChevronRight, 
   X,

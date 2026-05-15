@@ -20,12 +20,13 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
-        // 1. 사원 마스터 테이블 및 히스토리(2026년 기준) 확인
+        // 1. 사원 마스터 테이블 및 히스토리(전체) 확인
         const { data: employee, error: empError } = await supabase
           .from('employees')
           .select(`
             *,
             employee_history (
+              year,
               position,
               performance_rating,
               salary
@@ -34,7 +35,6 @@ const Auth = () => {
           .eq('employee_id', employeeId)
           .eq('full_name', fullName)
           .eq('department', department)
-          .eq('employee_history.year', 2026) // 가입 시 기본 2026년 기준 정보 확인
           .maybeSingle();
 
         if (empError || !employee) {
@@ -61,7 +61,10 @@ const Auth = () => {
 
         // 4. 프로필 생성
         if (authData.user) {
-          const history = employee.employee_history?.[0] || {};
+          const histories = employee.employee_history || [];
+          // 2026년 데이터가 있으면 우선 사용, 없으면 가장 최근 데이터 사용
+          const currentHistory = histories.find(h => h.year === 2026) || (histories.length > 0 ? histories[0] : {});
+          
           const { error: profileError } = await supabase
             .from('profiles')
             .insert([
@@ -69,9 +72,9 @@ const Auth = () => {
                 id: authData.user.id, 
                 full_name: fullName, 
                 department: department, 
-                position: history.position || '사원',
-                performance_rating: history.performance_rating || '-',
-                current_salary: history.salary || 0,
+                position: currentHistory.position || '사원',
+                performance_rating: currentHistory.performance_rating || '-',
+                current_salary: currentHistory.salary || 0,
                 hire_date: employee.hire_date,
                 employee_id: employeeId,
                 role: assignedRole
