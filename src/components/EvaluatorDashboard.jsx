@@ -836,10 +836,12 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                   )}
                   <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section>
 
-                  <div className="grid grid-cols-2 gap-4 pt-6">
-                    <button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4 text-sm">즉시 수락 및 합의</button>
-                    <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-sm">조건 제시</button>
-                  </div>
+                  {selectedNegotiation.status === 'counter_offer' && (
+                    <div className="grid grid-cols-2 gap-4 pt-6">
+                      <button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4 text-sm">즉시 수락 및 합의</button>
+                      <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-sm">조건 제시</button>
+                    </div>
+                  )}
                   <div className="pt-6 border-t border-gray-50">
                     <button 
                       onClick={() => handleDeleteNegotiation(selectedNegotiation.id)}
