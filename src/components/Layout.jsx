@@ -93,19 +93,23 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
             <h2 className="text-lg font-semibold text-[var(--color-primary)]">
               {menuItems.find(item => item.id === currentTab)?.label}
             </h2>
-            <div className="w-[1px] h-6 bg-gray-200 mx-4" />
-            <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
-              <Calendar size={16} className="text-gray-400" />
-              <select 
-                className="bg-transparent text-sm font-black text-[var(--color-primary)] outline-none cursor-pointer"
-                value={currentYear}
-                onChange={(e) => setCurrentYear(Number(e.target.value))}
-              >
-                {Array.from({ length: new Date().getFullYear() - 2024 + 1 }, (_, i) => 2024 + i).map(y => (
-                  <option key={y} value={y}>{y}년</option>
-                ))}
-              </select>
-            </div>
+            {currentTab === 'dashboard' && (
+              <>
+                <div className="w-[1px] h-6 bg-gray-200 mx-4" />
+                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                  <Calendar size={16} className="text-gray-400" />
+                  <select 
+                    className="bg-transparent text-sm font-black text-[var(--color-primary)] outline-none cursor-pointer"
+                    value={currentYear}
+                    onChange={(e) => setCurrentYear(Number(e.target.value))}
+                  >
+                    {Array.from({ length: new Date().getFullYear() - 2024 + 1 }, (_, i) => 2024 + i).map(y => (
+                      <option key={y} value={y}>{y}년</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
           
           <div className="flex items-center gap-6">

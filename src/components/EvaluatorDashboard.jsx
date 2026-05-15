@@ -612,9 +612,20 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               <p className="text-xs text-gray-400 font-medium">사원을 클릭하여 상세 연봉 및 고과 히스토리를 확인하세요.</p>
             </div>
             <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100 shadow-sm">
+                <Filter size={16} className="text-gray-400" />
+                <select 
+                  className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                  value={dbDeptFilter} 
+                  onChange={(e) => setDbDeptFilter(e.target.value)}
+                >
+                  <option value="전체">전체 부서</option>
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
-                <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
+                <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium outline-none" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
               </div>
             </div>
           </div>
@@ -692,14 +703,14 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
             </div>
           </div>
 
-          <div className="flex-1 flex gap-6 overflow-x-auto pb-4 custom-scrollbar">
+          <div className="flex-1 flex gap-4 overflow-hidden pb-4">
             {[
               { id: 'not_proposed', label: '미제안', color: 'bg-gray-400' },
               { id: 'proposed', label: '제안중', color: 'bg-blue-500' },
               { id: 'countering', label: '역제안중', color: 'bg-purple-500' },
               { id: 'finalized', label: '협상 완료', color: 'bg-green-500' }
             ].map(column => (
-              <div key={column.id} className="flex-1 min-w-[320px] flex flex-col bg-gray-50/30 rounded-[32px] border border-gray-100 overflow-hidden shadow-sm">
+              <div key={column.id} className="flex-1 min-w-[250px] flex flex-col bg-gray-50/30 rounded-[32px] border border-gray-100 overflow-hidden shadow-sm">
                 <div className="p-5 border-b border-gray-100 bg-white flex items-center justify-between">
                   <span className="text-sm font-black text-gray-900 flex items-center gap-2">
                     <div className={`w-2.5 h-2.5 rounded-full ${column.color} shadow-sm`} />
