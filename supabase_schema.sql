@@ -249,3 +249,11 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_on_final_agreement
 AFTER INSERT OR UPDATE OR DELETE ON negotiations
 FOR EACH ROW EXECUTE FUNCTION sync_final_agreement_to_master();
+
+-- [PATCH] 기존 테이블에 누락된 컬럼 추가용 (필요 시 실행)
+-- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS promotion_request BOOLEAN DEFAULT FALSE;
+-- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS employee_id TEXT REFERENCES employees(employee_id);
+-- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS year INTEGER NOT NULL DEFAULT 2026;
+-- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS jd TEXT;
+-- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS reason TEXT;
+

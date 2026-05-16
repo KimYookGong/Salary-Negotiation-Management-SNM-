@@ -617,6 +617,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       performance_rating: rating,
       evaluator_proposal: salary.replace(/[^0-9]/g, ''),
       year: currentYear,
+      promotion_request: promotionData.isPromoted || false,
       status: 'submitted',
       updated_at: new Date().toISOString()
     };
