@@ -6,7 +6,7 @@
 
 :root {
   /* Pantone Colors */
-  --color-primary: #014421;    /* Pantone 3435C */
+  --color-primary: #015C2D;    /* Lightened Pantone 3435C */
   --color-secondary: #003C71;  /* Pantone 541C */
   --color-accent-1: #A4D65E;   /* Pantone 367C */
   --color-accent-2: #FF6A13;   /* Pantone 1585C */
@@ -21,7 +21,7 @@
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 40px -10px rgba(0, 0, 0, 0.05);
   
   --font-main: 'Inter', sans-serif;
   --font-heading: 'Outfit', sans-serif;

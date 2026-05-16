@@ -78,17 +78,17 @@ const POSITION_SEQUENCE = ['사원', '주임', '대리', '과장', '차장', '�
 
 
 const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
-  const radius = 32;
+  const radius = 42;
   const circumference = 2 * Math.PI * radius;
   const remainingPercentage = Math.max(0, 100 - percentage);
   const offset = circumference - (remainingPercentage / 100) * circumference;
 
   return (
     <div className="relative flex flex-col items-center">
-      <svg className="w-20 h-20 transform -rotate-90">
-        <circle cx="40" cy="40" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="6" fill="transparent" />
+      <svg className="w-28 h-28 transform -rotate-90">
+        <circle cx="56" cy="56" r={radius} stroke="rgba(0,0,0,0.05)" strokeWidth="8" fill="transparent" />
         <circle 
-          cx="40" cy="40" r={radius} stroke={color} strokeWidth="6" fill="transparent"
+          cx="56" cy="56" r={radius} stroke={color} strokeWidth="8" fill="transparent"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
@@ -96,8 +96,8 @@ const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
         />
       </svg>
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-        <span className="text-sm font-black text-gray-900">{Math.round(remainingPercentage)}%</span>
-        <p className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
+        <span className="text-xl font-black text-gray-900">{Math.round(remainingPercentage)}%</span>
+        <p className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">{label}</p>
       </div>
     </div>
   );
@@ -622,42 +622,67 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
         <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-          <div className="flex items-center justify-between shrink-0 px-2">
-            <button 
-              onClick={() => fetchData()} 
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl transition-all text-xs font-bold"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              데이터 새로고침
-            </button>
-            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
-              <Filter size={16} className="text-gray-400" />
-              <select 
-                className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
-                value={dbDeptFilter} 
-                onChange={(e) => setDbDeptFilter(e.target.value)}
-              >
-                <option value="전체">회사 전체</option>
-                {departments.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+          <div className="flex flex-col gap-5 shrink-0">
+            <div className="flex items-center justify-between px-2">
+              <h3 className="text-xl font-black text-[var(--color-primary)] flex items-center gap-2">
+                <Wallet size={24} /> 예산 현황
+              </h3>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => fetchData()} 
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-600 rounded-2xl border border-gray-200 shadow-sm transition-all text-xs font-bold active:scale-95"
+                >
+                  <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+                  데이터 새로고침
+                </button>
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
+                  <Filter size={16} className="text-gray-400" />
+                  <select 
+                    className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
+                    value={dbDeptFilter} 
+                    onChange={(e) => setDbDeptFilter(e.target.value)}
+                  >
+                    <option value="전체">회사 전체</option>
+                    {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-3 shrink-0">
-            <h3 className="text-xl font-black text-[var(--color-primary)] px-2 flex items-center gap-2">
-              <Wallet size={20} /> 예산 현황
-            </h3>
-            <div className="bg-white p-8 rounded-[40px] shadow-sm border border-gray-100 flex items-center gap-16">
-              <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
-              <div className="flex items-center gap-16">
-                <div>
-                  <p className="text-[11px] font-black text-gray-400 mb-2 uppercase tracking-widest">배정 총예산</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* 총 예산 카드 */}
+              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">배정 총예산</p>
                   <p className="text-3xl font-black text-gray-900">{formatCurrencySimple(currentBudgetContext.limit)}</p>
                 </div>
-                <div className="w-[1px] h-12 bg-gray-100" />
-                <div>
-                  <p className="text-[11px] font-black text-gray-400 mb-2 uppercase tracking-widest">현재 사용액</p>
+                <div className="p-4 bg-gray-50 rounded-2xl text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-colors">
+                  <Wallet size={24} />
+                </div>
+              </div>
+
+              {/* 현재 사용액 카드 */}
+              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">현재 사용액</p>
                   <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrencySimple(currentBudgetContext.used)}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="w-[1px] h-12 bg-gray-100 hidden lg:block" />
+                  <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
+                </div>
+              </div>
+
+              {/* 잔여 예산 카드 */}
+              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">잔여 예산</p>
+                  <p className={`text-3xl font-black ${currentBudgetContext.limit - currentBudgetContext.used < 0 ? 'text-red-500' : 'text-[var(--color-secondary)]'}`}>
+                    {formatCurrencySimple(currentBudgetContext.limit - currentBudgetContext.used)}
+                  </p>
+                </div>
+                <div className="p-4 bg-gray-50 rounded-2xl text-gray-400 group-hover:bg-[var(--color-secondary)]/10 group-hover:text-[var(--color-secondary)] transition-colors">
+                  <TrendingUp size={24} />
                 </div>
               </div>
             </div>

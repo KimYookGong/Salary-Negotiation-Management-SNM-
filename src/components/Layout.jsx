@@ -18,14 +18,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const SidebarItem = ({ icon: Icon, label, active, onClick, collapsed }) => (
   <div 
-    className={`flex items-center gap-4 p-3 rounded-lg cursor-pointer transition-all duration-200 ${
-      active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
+    className={`relative flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-300 group ${
+      active 
+        ? 'bg-white/15 text-white shadow-lg' 
+        : 'text-white/60 hover:bg-white/10 hover:text-white'
     }`}
     onClick={onClick}
     title={collapsed ? label : ''}
   >
-    <Icon size={20} />
-    {!collapsed && <span className="font-medium">{label}</span>}
+    {active && (
+      <motion.div 
+        layoutId="active-pill"
+        className="absolute left-[-16px] w-1.5 h-6 bg-[var(--color-accent-1)] rounded-r-full shadow-[0_0_15px_rgba(164,214,94,0.5)]"
+      />
+    )}
+    <Icon size={20} className={`transition-transform duration-300 ${active ? 'scale-110 text-white' : 'group-hover:scale-110'}`} />
+    {!collapsed && <span className={`font-bold tracking-tight ${active ? 'text-white' : ''}`}>{label}</span>}
   </div>
 );
 
@@ -48,8 +56,8 @@ const Layout = ({ children, userRole, currentTab, setCurrentTab, session, profil
     <div className="flex min-h-screen bg-[#F8F9FA]">
       {/* Sidebar */}
       <aside 
-        className={`bg-[var(--color-primary)] text-white transition-all duration-300 flex flex-col ${
-          collapsed ? 'w-20' : 'w-64'
+        className={`bg-gradient-to-b from-[var(--color-primary)] to-[#014421] text-white transition-all duration-500 flex flex-col shadow-2xl z-20 ${
+          collapsed ? 'w-20' : 'w-72'
         }`}
       >
         <div className="p-6 flex items-center justify-between">

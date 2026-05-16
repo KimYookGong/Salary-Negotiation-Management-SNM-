@@ -114,10 +114,9 @@ const Auth = () => {
             <Sparkles size={32} />
           </div>
           <h1 className="text-3xl font-black text-[var(--color-primary)] tracking-tight mb-2">SalarySync</h1>
-          <p className="text-[var(--text-muted)] font-medium">데이터 기반의 스마트한 연봉 협상 솔루션</p>
         </div>
 
-        <div className="card shadow-2xl p-8 backdrop-blur-lg bg-white/80 border-white">
+        <div className="card shadow-[0_20px_50px_rgba(0,0,0,0.05)] p-10 backdrop-blur-lg bg-white/90 border-white/50">
           <h2 className="text-2xl font-bold mb-6 text-center">
             {isSignUp ? '회원가입' : '로그인'}
           </h2>
@@ -126,11 +125,11 @@ const Auth = () => {
             <div>
               <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">ID</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={20} />
                 <input 
                   type="email"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-[var(--color-primary)]/5 focus:bg-white focus:border-[var(--color-primary)] outline-none transition-all duration-300 font-medium"
                   placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -141,11 +140,11 @@ const Auth = () => {
             <div>
               <label className="block text-sm font-bold text-[var(--text-main)] mb-1.5">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={18} />
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" size={20} />
                 <input 
                   type="password"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border border-gray-100 rounded-2xl focus:ring-4 focus:ring-[var(--color-primary)]/5 focus:bg-white focus:border-[var(--color-primary)] outline-none transition-all duration-300 font-medium"
                   placeholder="••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -221,7 +220,7 @@ const Auth = () => {
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full btn btn-primary justify-center py-4 text-lg shadow-lg hover:shadow-primary/20 active:scale-[0.98]"
+              className="w-full btn btn-primary justify-center py-5 text-lg shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 rounded-2xl"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
