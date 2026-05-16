@@ -55,8 +55,13 @@ function App() {
         }
       } else if (data) {
         setProfile(data);
-        setUserRole(data.role || 'evaluatee');
+        const role = data.role || 'evaluatee';
+        setUserRole(role);
+        if (role === 'evaluatee') {
+          setCurrentTab('negotiation');
+        }
       }
+
     } catch (error) {
       console.error('Profile error:', error);
       setUserRole('evaluatee');

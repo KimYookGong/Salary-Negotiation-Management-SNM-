@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Send, History, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Send, History, CheckCircle, Clock, AlertCircle, Check, ChevronRight } from 'lucide-react';
+
 import { motion } from 'framer-motion';
 
 import { supabase } from '../supabaseClient';
