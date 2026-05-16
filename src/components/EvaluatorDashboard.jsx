@@ -493,10 +493,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       // 2. 협상 데이터 조회 (탭에 따라 필터링 다름)
       let negQuery = supabase.from('negotiations').select('*');
       
-      // 대시보드일 때만 연도 필터 적용
-      if (currentTab === 'dashboard') {
-        negQuery = negQuery.eq('year', currentYear);
-      }
+      // 선택된 연도 데이터만 조회
+      negQuery = negQuery.eq('year', currentYear);
       
       const { data: negs, error: negsError } = await negQuery.order('updated_at', { ascending: false });
       
@@ -694,7 +692,12 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       
       if (!searchMatch || !deptMatch || !posMatch) return;
 
-      const neg = negotiations.find(n => n.employee_id === emp.employee_id || (n.evaluatee_name === emp.full_name && n.department === emp.department));
+      const neg = negotiations.find(n => 
+        n.year === currentYear && (
+          n.employee_id === emp.employee_id || 
+          (n.evaluatee_name === emp.full_name && n.department === emp.department)
+        )
+      );
       
       const baseInfo = {
         id: emp.employee_id,
