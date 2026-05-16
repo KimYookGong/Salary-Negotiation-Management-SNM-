@@ -634,20 +634,11 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         payload.evaluatee_id = userProfile.id;
       }
 
-      // 기존 협상 데이터 조회 (ID, 사번 등으로 검색)
-      let negSearchQuery = supabase.from('negotiations').select('id');
-      
-      const conditions = [];
-      if (userProfile?.id) conditions.push(`evaluatee_id.eq.${userProfile.id}`);
-      if (selectedEmployeeForSalary.employee_id) conditions.push(`employee_id.eq.${selectedEmployeeForSalary.employee_id}`);
-      
-      if (conditions.length > 0) {
-        negSearchQuery = negSearchQuery.or(conditions.join(','));
-      } else {
-        negSearchQuery = negSearchQuery.eq('evaluatee_name', selectedEmployeeForSalary.full_name).eq('department', selectedEmployeeForSalary.department);
-      }
-
-      const { data: existingNeg, error: searchError } = await negSearchQuery
+      // 기존 협상 데이터 조회 (사번 + 연도 조합이 가장 확실함)
+      const { data: existingNeg, error: searchError } = await supabase
+        .from('negotiations')
+        .select('id')
+        .eq('employee_id', selectedEmployeeForSalary.employee_id)
         .eq('year', currentYear)
         .maybeSingle();
 

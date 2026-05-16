@@ -144,7 +144,7 @@ DECLARE
     new_impact BIGINT := 0;
     diff BIGINT := 0;
     target_year INT;
-    target_dept TEXT;
+    target_dept department_type;
     actual_salary BIGINT;
 BEGIN
     -- 삭제 또는 업데이트 시 이전 영향력 계산
