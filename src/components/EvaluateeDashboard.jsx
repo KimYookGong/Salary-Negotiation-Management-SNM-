@@ -98,31 +98,32 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
         setFormData({
           hopeSalary: data.evaluatee_proposal || '',
           rating: data.performance_rating || profile?.performance_rating || '',
-          isPromoted: data.promotion_request === 'true' || data.promotion_request === true,
+          isPromoted: data.promotion_request === true || data.promotion_request === 'true',
           jd: data.jd || '',
           achievement: data.reason || ''
         });
       } else {
-        setFormData({ 
+        setFormData(prev => ({ 
+          ...prev,
           hopeSalary: '', 
           rating: profile?.performance_rating || '', 
           isPromoted: false, 
           jd: '', 
           achievement: '' 
-        });
+        }));
       }
-
-
     }
 
-    // 전체 히스토리 조회 (최근 5년)
-    const { data: histData } = await supabase
-      .from('employee_history')
-      .select('*')
-      .eq('employee_id', profile.employee_id)
-      .order('year', { ascending: false });
-    
-    if (histData) setHistory(histData);
+    // 전체 히스토리 조회 (최근 5년) - employee_id가 있을 때만 실행
+    if (profile.employee_id) {
+      const { data: histData } = await supabase
+        .from('employee_history')
+        .select('*')
+        .eq('employee_id', profile.employee_id)
+        .order('year', { ascending: false });
+      
+      if (histData) setHistory(histData);
+    }
 
     setLoading(false);
   };
@@ -167,10 +168,9 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
     }
 
     if (error) {
-      alert('제출 중 오류가 발생했습니다.');
+      console.error('Submission error:', error);
+      alert(`제출 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`);
     } else {
-
-
       alert('성공적으로 제출되었습니다.');
       fetchNegotiation();
     }

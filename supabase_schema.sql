@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS negotiations (
   score DECIMAL(3, 2),
   jd TEXT,
   reason TEXT,
+  promotion_request BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
