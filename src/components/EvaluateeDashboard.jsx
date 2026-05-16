@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Send, History, CheckCircle, Clock, AlertCircle, Check, ChevronRight } from 'lucide-react';
+import { Send, History, CheckCircle, Clock, AlertCircle, Check, ChevronRight, FileText, MessageSquare } from 'lucide-react';
 
 import { motion } from 'framer-motion';
 
