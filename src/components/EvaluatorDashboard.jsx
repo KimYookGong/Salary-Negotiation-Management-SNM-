@@ -19,7 +19,8 @@ import {
   Wallet,
   ArrowUpRight,
   ShieldAlert,
-  RefreshCw
+  RefreshCw,
+  Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
