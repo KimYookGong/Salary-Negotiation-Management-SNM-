@@ -275,13 +275,13 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
             <div className="space-y-6">
               {/* 상단 3개 필드 그리드 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 연봉</label>
-                  <div className="relative group">
+                  <div className="relative group h-[72px]">
                     <input 
                       type="text"
-                      className="w-full p-4 pr-14 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-xl font-black text-[var(--color-primary)] shadow-sm"
+                      className="w-full h-full p-4 pr-14 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-xl font-black text-[var(--color-primary)] shadow-sm"
                       placeholder="50,000,000"
                       value={formatInputCurrency(formData.hopeSalary)}
                       onChange={(e) => setFormData({ ...formData, hopeSalary: e.target.value.replace(/[^0-9]/g, '') })}
@@ -295,13 +295,13 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 등급</label>
-                  <div className="flex gap-1.5 p-1 bg-gray-50 border-2 border-gray-100 rounded-2xl">
+                  <div className="flex items-center gap-1.5 p-1.5 bg-gray-50 border-2 border-gray-100 rounded-2xl h-[72px]">
                     {['S', 'A', 'B', 'C', 'D'].map(r => (
                       <button 
                         key={r}
                         type="button"
                         onClick={() => setFormData({ ...formData, rating: r })}
-                        className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${
+                        className={`flex-1 h-full rounded-xl text-xs font-black transition-all ${
                           formData.rating === r 
                             ? 'bg-[var(--color-primary)] text-white shadow-lg shadow-primary/20 scale-105' 
                             : 'text-gray-400 hover:bg-white hover:text-gray-600'
@@ -318,24 +318,24 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                   <button 
                     type="button"
                     onClick={() => setFormData({ ...formData, isPromoted: !formData.isPromoted })}
-                    className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${
+                    className={`w-full h-[72px] px-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${
                       formData.isPromoted 
                         ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/5' 
                         : 'border-gray-100 bg-gray-50 hover:border-gray-200'
                     }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
                         formData.isPromoted ? 'bg-[var(--color-secondary)] text-white' : 'bg-white text-gray-200 border border-gray-200'
                       }`}>
                         <Check size={14} strokeWidth={4} />
                       </div>
-                      <span className={`text-sm font-black transition-colors ${formData.isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                      <span className={`text-sm font-black transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${formData.isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
                         {formData.isPromoted ? '승진 요청됨' : '승진 요청하기'}
                       </span>
                     </div>
                     {formData.isPromoted && profile?.position && (
-                      <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-300 bg-white/50 px-2 py-1 rounded-lg">
+                      <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-300 bg-white/50 px-1.5 py-1 rounded-lg shrink-0">
                         <span className="text-[9px] font-bold text-gray-400 line-through leading-none">{profile.position}</span>
                         <ChevronRight size={10} className="text-gray-300" />
                         <span className="text-[11px] font-black text-[var(--color-secondary)] leading-none">
@@ -343,10 +343,10 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                         </span>
                       </div>
                     )}
-
                   </button>
                 </div>
               </div>
+
 
               {/* 하단 2개 텍스트영역 */}
 
