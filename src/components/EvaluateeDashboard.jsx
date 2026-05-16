@@ -65,6 +65,13 @@ const formatInputCurrency = (value) => {
 
 
 const EvaluateeDashboard = ({ profile, currentYear }) => {
+  const positions = ['사원', '주임', '대리', '과장', '차장', '부장'];
+  const getNextPosition = (current) => {
+    const idx = positions.indexOf(current);
+    if (idx === -1 || idx === positions.length - 1) return current;
+    return positions[idx + 1];
+  };
+
   const [negotiation, setNegotiation] = useState(null);
   const [masterSalary, setMasterSalary] = useState(0); // 마스터 데이터 연봉 추가
   const [history, setHistory] = useState([]); // 히스토리 상태 추가
@@ -312,7 +319,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                             <div>
                               <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
                               <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
-                                {negotiation.promotion_request ? '요청함' : '미요청'}
+                                {negotiation.promotion_request ? `${getNextPosition(profile?.position)} 승진 요청` : '미요청'}
                               </p>
                             </div>
                           </div>
