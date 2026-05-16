@@ -54,13 +54,38 @@ function App() {
           setUserRole(newProfile.role);
         }
       } else if (data) {
-        setProfile(data);
-        const role = data.role || 'evaluatee';
+        let profileData = data;
+        
+        // [강화] 사원 번호가 없는 경우 이름으로 사원 테이블에서 찾아 연동 시도
+        if (!profileData.employee_id) {
+          const { data: empData } = await supabase
+            .from('employees')
+            .select('employee_id, hire_date')
+            .eq('full_name', profileData.full_name)
+            .maybeSingle();
+          
+          if (empData) {
+            const { data: updatedProfile } = await supabase
+              .from('profiles')
+              .update({ 
+                employee_id: empData.employee_id,
+                hire_date: empData.hire_date 
+              })
+              .eq('id', userId)
+              .select()
+              .single();
+            if (updatedProfile) profileData = updatedProfile;
+          }
+        }
+
+        setProfile(profileData);
+        const role = profileData.role || 'evaluatee';
         setUserRole(role);
         if (role === 'evaluatee') {
           setCurrentTab('negotiation');
         }
       }
+
 
     } catch (error) {
       console.error('Profile error:', error);

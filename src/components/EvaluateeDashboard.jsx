@@ -151,6 +151,12 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       updated_at: new Date()
     };
 
+    // employee_id가 없거나 빈 문자열이면 payload에서 제거하여 외래키 제약 오류 방지
+    if (!payload.employee_id) {
+      delete payload.employee_id;
+    }
+
+
 
 
     let error;
