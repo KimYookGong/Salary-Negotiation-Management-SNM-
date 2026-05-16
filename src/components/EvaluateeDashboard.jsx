@@ -269,7 +269,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-bold text-gray-400">현재 연봉</span>
-                        <p className="text-sm font-bold text-gray-600">{formatCurrency(actualCurrentSalary)}</p>
+                        <p className="text-sm font-black text-gray-700">{formatCurrency(actualCurrentSalary)}</p>
                       </div>
                       <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
                         <span className="text-sm font-bold text-gray-500">희망 연봉</span>
@@ -278,7 +278,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                       <div className="flex justify-between items-center pt-1">
                         <span className="text-[10px] font-bold text-gray-400">현재 대비 인상액</span>
                         <p className="text-xs font-black text-[var(--color-primary)]">
-                          {actualCurrentSalary > 0 ? `+${formatCurrency(hopeProposal - actualCurrentSalary)}` : '-'}
+                          {actualCurrentSalary > 0 ? `+${formatCurrency(hopeProposal - actualCurrentSalary)}` : `+${formatCurrency(hopeProposal)} (기준연봉 0)`}
                         </p>
                       </div>
                       <div className="flex justify-between items-center">
@@ -290,12 +290,12 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                         </p>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200/50">
-                        <div className="bg-white p-3 rounded-xl border border-gray-100">
+                      <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-200/50">
+                        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
                           <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
-                          <p className="text-sm font-black text-gray-700">{negotiation.performance_rating} 등급</p>
+                          <p className="text-sm font-black text-gray-900">{negotiation.performance_rating || '-'} 등급</p>
                         </div>
-                        <div className="bg-white p-3 rounded-xl border border-gray-100">
+                        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
                           <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
                           <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
                             {negotiation.promotion_request ? '요청함' : '미요청'}
@@ -328,7 +328,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                         <div className="flex justify-between items-center pt-2 border-t border-[var(--color-primary)]/10">
                           <span className="text-[10px] font-bold text-gray-500">현재 대비 인상액</span>
                           <p className="text-xs font-black text-[var(--color-primary)]">
-                            {actualCurrentSalary > 0 ? `+${formatCurrency(evalProposal - actualCurrentSalary)}` : '-'}
+                            {actualCurrentSalary > 0 ? `+${formatCurrency(evalProposal - actualCurrentSalary)}` : `+${formatCurrency(evalProposal)} (기준연봉 0)`}
                           </p>
                         </div>
                         <div className="flex justify-between items-center">
