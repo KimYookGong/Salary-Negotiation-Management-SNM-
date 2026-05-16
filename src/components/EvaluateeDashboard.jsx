@@ -51,12 +51,15 @@ const calculateTenure = (hireDate) => {
 };
 
 // 입력용 천단위 구분기호 포맷터
+const POSITION_SEQUENCE = ['사원', '주임', '대리', '과장', '차장', '부장'];
+
 const formatInputCurrency = (value) => {
-  if (!value) return '';
+  if (!value && value !== 0) return '';
   const num = value.toString().replace(/[^0-9]/g, '');
   if (!num) return '';
-  return Number(num).toLocaleString() + '원';
+  return Number(num).toLocaleString();
 };
+
 
 
 
@@ -67,10 +70,11 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
   const [formData, setFormData] = useState({
     hopeSalary: '',
     rating: '',
-    promotionRequest: '',
+    isPromoted: false,
     jd: '',
     achievement: ''
   });
+
 
 
   const fetchNegotiation = async () => {
@@ -93,7 +97,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
         setFormData({
           hopeSalary: data.evaluatee_proposal || '',
           rating: data.performance_rating || profile?.performance_rating || '',
-          promotionRequest: data.promotion_request || '',
+          isPromoted: data.promotion_request === 'true' || data.promotion_request === true,
           jd: data.jd || '',
           achievement: data.reason || ''
         });
@@ -101,11 +105,12 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
         setFormData({ 
           hopeSalary: '', 
           rating: profile?.performance_rating || '', 
-          promotionRequest: '', 
+          isPromoted: false, 
           jd: '', 
           achievement: '' 
         });
       }
+
 
     }
 
@@ -139,10 +144,11 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       jd: formData.jd,
       evaluatee_proposal: formData.hopeSalary,
       reason: formData.achievement,
-      promotion_request: formData.promotionRequest,
+      promotion_request: formData.isPromoted,
       status: 'counter_offer',
       updated_at: new Date()
     };
+
 
 
     let error;
@@ -268,48 +274,80 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
             <div className="space-y-6">
               {/* 상단 3개 필드 그리드 */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 연봉</label>
                   <div className="relative group">
                     <input 
                       type="text"
-                      className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-lg font-black text-[var(--color-primary)] shadow-sm"
-                      placeholder="예: 75,000,000"
+                      className="w-full p-4 pr-14 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-xl font-black text-[var(--color-primary)] shadow-sm"
+                      placeholder="50,000,000"
                       value={formatInputCurrency(formData.hopeSalary)}
                       onChange={(e) => setFormData({ ...formData, hopeSalary: e.target.value.replace(/[^0-9]/g, '') })}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-300">원</span>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                      <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+                      <span className="text-sm font-black text-gray-400 group-focus-within:text-[var(--color-primary)] transition-colors">원</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 등급</label>
-                  <select 
-                    className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-lg font-black text-gray-700 shadow-sm appearance-none"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                  >
-                    <option value="">등급 선택</option>
+                  <div className="flex gap-1.5 p-1 bg-gray-50 border-2 border-gray-100 rounded-2xl">
                     {['S', 'A', 'B', 'C', 'D'].map(r => (
-                      <option key={r} value={r}>{r} 등급</option>
+                      <button 
+                        key={r}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, rating: r })}
+                        className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all ${
+                          formData.rating === r 
+                            ? 'bg-[var(--color-primary)] text-white shadow-lg shadow-primary/20 scale-105' 
+                            : 'text-gray-400 hover:bg-white hover:text-gray-600'
+                        }`}
+                      >
+                        {r}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">승진 요청</label>
-                  <input 
-                    type="text"
-                    className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-base font-bold text-gray-700 shadow-sm"
-                    placeholder="예: 과장 승진 희망"
-                    value={formData.promotionRequest}
-                    onChange={(e) => setFormData({ ...formData, promotionRequest: e.target.value })}
-                  />
+                  <button 
+                    type="button"
+                    onClick={() => setFormData({ ...formData, isPromoted: !formData.isPromoted })}
+                    className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between group ${
+                      formData.isPromoted 
+                        ? 'border-[var(--color-secondary)] bg-[var(--color-secondary)]/5' 
+                        : 'border-gray-100 bg-gray-50 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
+                        formData.isPromoted ? 'bg-[var(--color-secondary)] text-white' : 'bg-white text-gray-200 border border-gray-200'
+                      }`}>
+                        <Check size={14} strokeWidth={4} />
+                      </div>
+                      <span className={`text-sm font-black transition-colors ${formData.isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                        {formData.isPromoted ? '승진 요청됨' : '승진 요청하기'}
+                      </span>
+                    </div>
+                    {formData.isPromoted && profile?.position && (
+                      <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-2 duration-300">
+                        <span className="text-[10px] font-bold text-gray-400 line-through">{profile.position}</span>
+                        <ChevronRight size={12} className="text-gray-400" />
+                        <span className="text-xs font-black text-[var(--color-secondary)]">
+                          {POSITION_SEQUENCE[POSITION_SEQUENCE.indexOf(profile.position) + 1] || profile.position}
+                        </span>
+                      </div>
+                    )}
+                  </button>
                 </div>
               </div>
 
               {/* 하단 2개 텍스트영역 */}
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">직무기술서 (JD)</label>
                 <textarea 
