@@ -606,49 +606,75 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const handleSalaryProposal = async (rating, salary, rate, promotionData = {}) => {
     if (!selectedEmployeeForSalary) return;
     
-    const { data: userProfile } = await supabase.from('profiles').select('id').eq('employee_id', selectedEmployeeForSalary.employee_id).single();
-    const payload = {
-      employee_id: selectedEmployeeForSalary.employee_id, // 사번 추가
-      evaluatee_name: selectedEmployeeForSalary.full_name,
-      department: selectedEmployeeForSalary.department,
-      position: promotionData.position || selectedEmployeeForSalary.position,
-      current_salary: selectedEmployeeForSalary.current_salary,
-      performance_rating: rating,
-      evaluator_proposal: salary.replace(/[^0-9]/g, ''),
-      year: currentYear,
-      promotion_request: promotionData.isPromoted || false,
-      status: 'submitted',
-      updated_at: new Date().toISOString()
-    };
+    try {
+      // 해당 사원의 프로필 정보(UUID) 조회
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('employee_id', selectedEmployeeForSalary.employee_id)
+        .maybeSingle();
 
-    if (userProfile) payload.evaluatee_id = userProfile.id;
+      if (profileError) console.error('Profile fetch error:', profileError);
 
-    // 기존 협상 데이터 조회 (ID, 사번, 또는 성명+부서 조합으로 검색)
-    let negSearchQuery = supabase.from('negotiations').select('id');
-    
-    const conditions = [];
-    if (userProfile) conditions.push(`evaluatee_id.eq.${userProfile.id}`);
-    if (selectedEmployeeForSalary.employee_id) conditions.push(`employee_id.eq.${selectedEmployeeForSalary.employee_id}`);
-    
-    if (conditions.length > 0) {
-      negSearchQuery = negSearchQuery.or(conditions.join(','));
-    } else {
-      negSearchQuery = negSearchQuery.eq('evaluatee_name', selectedEmployeeForSalary.full_name).eq('department', selectedEmployeeForSalary.department);
+      const payload = {
+        employee_id: selectedEmployeeForSalary.employee_id,
+        evaluatee_name: selectedEmployeeForSalary.full_name,
+        department: selectedEmployeeForSalary.department,
+        position: promotionData.position || selectedEmployeeForSalary.position,
+        current_salary: Number(selectedEmployeeForSalary.current_salary || 0),
+        performance_rating: rating,
+        evaluator_proposal: salary.toString().replace(/[^0-9]/g, ''),
+        year: currentYear,
+        promotion_request: promotionData.isPromoted || false,
+        status: 'submitted',
+        updated_at: new Date().toISOString()
+      };
+
+      if (userProfile?.id) {
+        payload.evaluatee_id = userProfile.id;
+      }
+
+      // 기존 협상 데이터 조회 (ID, 사번 등으로 검색)
+      let negSearchQuery = supabase.from('negotiations').select('id');
+      
+      const conditions = [];
+      if (userProfile?.id) conditions.push(`evaluatee_id.eq.${userProfile.id}`);
+      if (selectedEmployeeForSalary.employee_id) conditions.push(`employee_id.eq.${selectedEmployeeForSalary.employee_id}`);
+      
+      if (conditions.length > 0) {
+        negSearchQuery = negSearchQuery.or(conditions.join(','));
+      } else {
+        negSearchQuery = negSearchQuery.eq('evaluatee_name', selectedEmployeeForSalary.full_name).eq('department', selectedEmployeeForSalary.department);
+      }
+
+      const { data: existingNeg, error: searchError } = await negSearchQuery
+        .eq('year', currentYear)
+        .maybeSingle();
+
+      if (searchError) throw searchError;
+
+      let saveError;
+      if (existingNeg) {
+        // 기존 내역 업데이트
+        const { error } = await supabase.from('negotiations').update(payload).eq('id', existingNeg.id);
+        saveError = error;
+      } else {
+        // 신규 내역 생성
+        const { error } = await supabase.from('negotiations').insert([payload]);
+        saveError = error;
+      }
+
+      if (saveError) throw saveError;
+
+      alert(`${selectedEmployeeForSalary.full_name} 님에 대한 제안이 성공적으로 저장되었습니다.`);
+      setIsSalaryPopupOpen(false); 
+      setSelectedEmployeeForSalary(null); 
+      fetchData();
+
+    } catch (error) {
+      console.error('Salary proposal save error:', error);
+      alert('제안 저장 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
     }
-
-    const { data: existingNeg } = await negSearchQuery
-      .eq('year', currentYear)
-      .maybeSingle();
-
-    if (existingNeg) {
-      await supabase.from('negotiations').update(payload).eq('id', existingNeg.id);
-    } else {
-      await supabase.from('negotiations').insert([payload]);
-    }
-
-    setIsSalaryPopupOpen(false); 
-    setSelectedEmployeeForSalary(null); 
-    fetchData();
   };
 
   const handleSort = (key) => {
