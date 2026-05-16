@@ -525,7 +525,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
               {/* 하단 2개 텍스트영역 */}
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">직무기술서 (JD)</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">직무기술서</label>
                 <textarea 
                   className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all h-32 text-sm font-medium leading-relaxed shadow-sm"
                   placeholder="현재 담당하고 있는 핵심 업무와 책임을 구체적으로 설명해주세요."

@@ -1193,10 +1193,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                       </section>
 
                       {/* 하단 상세 정보 (JD, 성과 요약) */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="grid grid-cols-1 gap-8">
                         <section>
                           <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
-                            <FileText size={14} className="text-gray-400" /> 직무기술서 (JD)
+                            <FileText size={14} className="text-gray-400" /> 직무기술서
                           </h4>
                           <div className="p-7 bg-white border border-gray-100 rounded-[32px] min-h-[140px] shadow-sm">
                             <p className="text-sm text-gray-500 font-medium leading-relaxed whitespace-pre-wrap">
