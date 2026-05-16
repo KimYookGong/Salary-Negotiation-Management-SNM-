@@ -223,38 +223,94 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
             <StatusBadge status={negotiation.status} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* 왼쪽: 나의 요구안 */}
             <div className="space-y-4">
-              <div className="p-4 bg-[var(--bg-main)] rounded-lg">
-                <p className="text-xs font-semibold text-[var(--text-muted)] uppercase mb-2">나의 요구안</p>
-                <p className="text-2xl font-bold text-[var(--color-primary)]">{negotiation.evaluatee_proposal}</p>
+              <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">나의 요구안</p>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-end">
+                    <span className="text-sm font-bold text-gray-500">희망 연봉</span>
+                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatInputCurrency(negotiation.evaluatee_proposal)}원</p>
+                  </div>
+                  {negotiation.performance_rating && (
+                    <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
+                      <span className="text-sm font-bold text-gray-500">희망 등급</span>
+                      <span className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-700">{negotiation.performance_rating} 등급</span>
+                    </div>
+                  )}
+                </div>
               </div>
-              {negotiation.status === 'counter_offer' && (
-                <div className="p-4 bg-orange-50 border border-orange-100 rounded-lg">
-                  <p className="text-xs font-semibold text-orange-800 uppercase mb-2">평가자 역제시</p>
-                  <p className="text-2xl font-bold text-[var(--color-accent-2)]">{formatInputCurrency(negotiation.evaluator_proposal)}</p>
-                  <p className="mt-3 text-sm text-gray-700 leading-relaxed italic">
-                    "{negotiation.evaluator_comment}"
+            </div>
+
+            {/* 오른쪽: 평가자 제안 (제안이 있는 경우만 표시) */}
+            <div className="space-y-4">
+              {negotiation.evaluator_proposal ? (
+                <div className="p-6 bg-[var(--color-primary)]/5 rounded-2xl border-2 border-[var(--color-primary)] shadow-lg shadow-primary/5 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-2">
+                    <div className="bg-[var(--color-primary)] text-white text-[9px] font-black px-2 py-1 rounded-bl-xl uppercase tracking-tighter">Official Proposal</div>
+                  </div>
+                  
+                  <p className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <CheckCircle size={14} />
+                    평가자 제안 상세
                   </p>
+                  
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <span className="text-sm font-bold text-gray-600">제안 연봉</span>
+                      <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(negotiation.evaluator_proposal)}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--color-primary)]/10">
+                      <div className="bg-white p-3 rounded-xl border border-[var(--color-primary)]/10">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">확정 등급</p>
+                        <p className="text-sm font-black text-gray-900">{negotiation.performance_rating} 등급</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-[var(--color-primary)]/10">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-1">직급 변동</p>
+                        <p className="text-sm font-black text-gray-900">{negotiation.position || profile?.position}</p>
+                      </div>
+                    </div>
+
+                    {negotiation.evaluator_comment && (
+                      <div className="mt-4 p-4 bg-white/60 rounded-xl border border-[var(--color-primary)]/5">
+                        <p className="text-[9px] font-black text-gray-400 uppercase mb-2">검토 의견</p>
+                        <p className="text-sm text-gray-700 leading-relaxed italic font-medium">
+                          "{negotiation.evaluator_comment}"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center p-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400">
+                  <Clock size={32} className="mb-3 opacity-20" />
+                  <p className="text-sm font-bold text-center">평가자가 제안을 검토 중입니다.<br/><span className="text-xs font-normal">곧 공식 제안이 도착할 예정입니다.</span></p>
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="flex flex-col justify-end gap-3">
+          {negotiation.evaluator_proposal && (
+            <div className="flex gap-4 mt-8 pt-8 border-t border-gray-100">
               <button 
                 onClick={() => alert('최종 합의 기능은 준비 중입니다.')}
-                className="btn btn-primary w-full justify-center"
+                className="flex-1 py-4 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
               >
-                수락 및 최종 합의
+                <Check size={20} />
+                제안 수락 및 최종 합의
               </button>
               <button 
-                onClick={() => alert('추가 근거 제출 기능은 아래 폼을 이용해 주세요.')}
-                className="btn btn-outline w-full justify-center"
+                onClick={() => alert('추가 근거 제출은 아래 폼을 이용해 주세요.')}
+                className="flex-1 py-4 bg-white text-gray-600 border-2 border-gray-100 text-base font-black rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
               >
+                <AlertCircle size={20} />
                 추가 근거 제출 및 역제시
               </button>
             </div>
-          </div>
+          )}
+
         </motion.div>
       ) : (
         <div className="card text-center py-12 bg-gray-50 border-dashed">
