@@ -335,14 +335,15 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                       </span>
                     </div>
                     {formData.isPromoted && profile?.position && (
-                      <div className="flex items-center gap-1.5 animate-in fade-in slide-in-from-right-2 duration-300">
-                        <span className="text-[10px] font-bold text-gray-400 line-through">{profile.position}</span>
-                        <ChevronRight size={12} className="text-gray-400" />
-                        <span className="text-xs font-black text-[var(--color-secondary)]">
+                      <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-300 bg-white/50 px-2 py-1 rounded-lg">
+                        <span className="text-[9px] font-bold text-gray-400 line-through leading-none">{profile.position}</span>
+                        <ChevronRight size={10} className="text-gray-300" />
+                        <span className="text-[11px] font-black text-[var(--color-secondary)] leading-none">
                           {POSITION_SEQUENCE[POSITION_SEQUENCE.indexOf(profile.position) + 1] || profile.position}
                         </span>
                       </div>
                     )}
+
                   </button>
                 </div>
               </div>
