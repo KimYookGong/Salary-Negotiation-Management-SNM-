@@ -33,6 +33,25 @@ const statusMap = {
   cancelled: { label: '미제안', className: 'bg-gray-100 text-gray-600', icon: AlertCircle },
 };
 
+// 상대적 시간 포맷터
+const formatRelativeTime = (dateString) => {
+  if (!dateString) return '';
+  const now = new Date();
+  const updated = new Date(dateString);
+  const diffInSeconds = Math.floor((now - updated) / 1000);
+
+  if (diffInSeconds < 60) return '방금 전';
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `${diffInMinutes}분 전`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `${diffInHours}시간 전`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) return `${diffInDays}일 전`;
+  
+  return updated.toLocaleDateString();
+};
+
+
 // 금액 포맷터
 const formatCurrency = (value) => {
   if (!value && value !== 0) return '-';
@@ -375,9 +394,11 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
 
 const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [negotiations, setNegotiations] = useState([]);
+  const [recentUpdates, setRecentUpdates] = useState([]); // 최근 업데이트 데이터
   const [employees, setEmployees] = useState([]);
   const [budgets, setBudgets] = useState({ company: null, depts: [] });
   const [loading, setLoading] = useState(true);
+
   
   const [dbSearchTerm, setDbSearchTerm] = useState('');
   const [dbDeptFilter, setDbDeptFilter] = useState('전체');
@@ -394,17 +415,30 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      // 협상 데이터 조회 (현재 연도 필터링)
-      const { data: negs, error: negsError } = await supabase
+      
+      // 1. 최근 업데이트 데이터 조회 (알림용 - 연도 무관 최신 5건)
+      const { data: recent, error: recentError } = await supabase
         .from('negotiations')
         .select('*')
-        .eq('year', currentYear)
-        .order('updated_at', { ascending: false });
+        .order('updated_at', { ascending: false })
+        .limit(5);
+      
+      if (!recentError && recent) setRecentUpdates(recent);
+
+      // 2. 협상 데이터 조회 (탭에 따라 필터링 다름)
+      let negQuery = supabase.from('negotiations').select('*');
+      
+      // 대시보드일 때만 연도 필터 적용
+      if (currentTab === 'dashboard') {
+        negQuery = negQuery.eq('year', currentYear);
+      }
+      
+      const { data: negs, error: negsError } = await negQuery.order('updated_at', { ascending: false });
       
       if (negsError) throw negsError;
       if (negs) setNegotiations(negs);
 
-      // 사원 및 히스토리 조회 (현재 연도 및 전년도 데이터 조인)
+      // 3. 사원 및 히스토리 조회 (전체 데이터 가져오기)
       const { data: emps, error: empsError } = await supabase
         .from('employees')
         .select(`
@@ -416,31 +450,35 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
             performance_rating
           )
         `);
-        // .eq('employee_history.year', currentYear); // 특정 연도 필터 대신 전체/범위 조회 후 JS에서 처리
 
       if (empsError) throw empsError;
       
-      // 데이터 평탄화 (현재 연도 데이터 우선, 없으면 전년도 데이터 사용)
+      // 데이터 평탄화 (사원현황 탭은 최신 데이터, 대시보드는 선택 연도 데이터)
       const flattenedEmps = emps?.map(emp => {
         const histories = emp.employee_history || [];
-        // 1순위: 현재 선택된 연도 데이터
-        const currentHist = histories.find(h => h.year === currentYear);
-        // 2순위: 전년도 데이터
-        const prevHist = histories.find(h => h.year === currentYear - 1);
         
-        const activeHist = currentHist || prevHist || {};
+        let activeHist;
+        if (currentTab === 'dashboard') {
+          // 대시보드: 선택된 연도 -> 없으면 전년도
+          activeHist = histories.find(h => h.year === currentYear) || histories.find(h => h.year === currentYear - 1);
+        } else {
+          // 사원현황/협상관리: 가장 최근 연도 데이터
+          activeHist = [...histories].sort((a, b) => b.year - a.year)[0];
+        }
+        
+        const data = activeHist || {};
 
         return {
           ...emp,
-          position: activeHist.position || emp.position,
-          current_salary: activeHist.salary || 0,
-          performance_rating: activeHist.performance_rating || '-'
+          position: data.position || emp.position,
+          current_salary: data.salary || 0,
+          performance_rating: data.performance_rating || '-'
         };
       }) || [];
       
       setEmployees(flattenedEmps);
 
-      // 예산 조회 (현재 연도)
+      // 4. 예산 조회 (항상 현재 연도 기준 - 대시보드용)
       const { data: companyBudget, error: budgetError } = await supabase
         .from('budgets')
         .select('*')
@@ -453,20 +491,18 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         .eq('year', currentYear);
       
       if (!companyBudget && (!budgetError)) {
-        // 해당 연도 예산이 없으면 초기화 (트리거가 자동 생성하겠지만 명시적 처리)
         setBudgets(prev => ({ ...prev, company: { year: currentYear, total_budget: 0, used_budget: 0 } }));
       } else {
         setBudgets(prev => ({ ...prev, company: companyBudget }));
       }
 
-      if (!deptBudgets || deptBudgets.length === 0) {
-        // 부서 예산 초기화 (샘플 데이터)
+      if (deptBudgets && deptBudgets.length > 0) {
+        setBudgets(prev => ({ ...prev, depts: deptBudgets }));
+      } else {
         const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
         const dummyDepts = depts.map(d => ({ department_name: d, year: currentYear, total_budget: 200000000, used_budget: 0 }));
         const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
         setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
-      } else {
-        setBudgets(prev => ({ ...prev, depts: deptBudgets }));
       }
 
     } catch (error) {
@@ -475,6 +511,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchData();
@@ -649,43 +686,122 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* 총 예산 카드 */}
-              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                <div className="space-y-1">
-                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">배정 총예산</p>
-                  <p className="text-3xl font-black text-gray-900">{formatCurrencySimple(currentBudgetContext.limit)}</p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-2xl text-gray-400 group-hover:bg-[var(--color-primary)]/10 group-hover:text-[var(--color-primary)] transition-colors">
-                  <Wallet size={24} />
-                </div>
-              </div>
-
-              {/* 현재 사용액 카드 */}
-              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                <div className="space-y-1">
-                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">현재 사용액</p>
-                  <p className="text-3xl font-black text-[var(--color-primary)]">{formatCurrencySimple(currentBudgetContext.used)}</p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-[1px] h-12 bg-gray-100 hidden lg:block" />
-                  <BudgetDonut percentage={budgetPercentage} label={currentBudgetContext.label} color={dbDeptFilter === '전체' ? "var(--color-primary)" : "var(--color-secondary)"} />
+            <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col gap-6 group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-[var(--color-primary)]/10 rounded-2xl text-[var(--color-primary)]">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">부서 예산 요약</p>
+                    <h4 className="text-lg font-black text-gray-900">{currentBudgetContext.label}</h4>
+                  </div>
                 </div>
               </div>
 
-              {/* 잔여 예산 카드 */}
-              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 flex items-center justify-between group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                 <div className="space-y-1">
-                  <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">잔여 예산</p>
-                  <p className={`text-3xl font-black ${currentBudgetContext.limit - currentBudgetContext.used < 0 ? 'text-red-500' : 'text-[var(--color-secondary)]'}`}>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">배정 총예산</p>
+                  <p className="text-2xl font-black text-gray-900">{formatCurrencySimple(currentBudgetContext.limit)}</p>
+                </div>
+                
+                <div className="space-y-1 relative">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 사용액</p>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrencySimple(currentBudgetContext.used)}</p>
+                    <span className="text-xs font-black text-gray-400">({Math.round(budgetPercentage)}%)</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">잔여 예산</p>
+                  <p className={`text-2xl font-black ${currentBudgetContext.limit - currentBudgetContext.used < 0 ? 'text-red-500' : 'text-[var(--color-secondary)]'}`}>
                     {formatCurrencySimple(currentBudgetContext.limit - currentBudgetContext.used)}
                   </p>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-2xl text-gray-400 group-hover:bg-[var(--color-secondary)]/10 group-hover:text-[var(--color-secondary)] transition-colors">
-                  <TrendingUp size={24} />
-                </div>
+              </div>
+
+              <div className="w-full h-3 bg-gray-50 rounded-full overflow-hidden shadow-inner border border-gray-100">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(budgetPercentage, 100)}%` }}
+                  className={`h-full transition-all duration-1000 ${budgetPercentage > 90 ? 'bg-red-500' : 'bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)]'}`}
+                />
               </div>
             </div>
+
+            {/* 중요 알림 블록 */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 group hover:border-[var(--color-primary)]/30 transition-all duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-orange-100 rounded-2xl text-orange-600">
+                      <AlertCircle size={20} />
+                    </div>
+                    <h3 className="text-lg font-black text-gray-900">중요 알림</h3>
+                  </div>
+                  <button onClick={() => fetchData()} className="text-xs font-bold text-gray-400 hover:text-[var(--color-primary)] transition-colors">전체보기</button>
+                </div>
+                
+                <div className="space-y-4">
+                  {recentUpdates.length > 0 ? (
+                    recentUpdates.map((update) => (
+                      <div key={update.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-transparent hover:border-gray-100 hover:bg-white transition-all group/item">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${statusMap[update.status]?.className}`}>
+                            {statusMap[update.status]?.label.substring(0, 1)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">
+                              <span className="text-[var(--color-primary)]">{update.evaluatee_name}</span>님의 협상 상태가 
+                              <span className="mx-1 px-2 py-0.5 bg-white border border-gray-100 rounded-lg text-[10px] font-black">{statusMap[update.status]?.label}</span>
+                              (으)로 변경되었습니다.
+                            </p>
+                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">{update.department} / {update.position}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-black text-gray-300 group-hover/item:text-[var(--color-primary)] transition-colors">{formatRelativeTime(update.updated_at)}</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-12 text-center text-gray-400 font-medium">최근 업데이트된 내역이 없습니다.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* 통계 요약 등 추가 가능 공간 */}
+              <div className="bg-gradient-to-br from-[var(--color-primary)] to-[#014421] p-8 rounded-[32px] shadow-lg shadow-primary/20 text-white relative overflow-hidden group">
+                <div className="relative z-10">
+                  <h3 className="text-xl font-black mb-2">협상 진행률</h3>
+                  <p className="text-white/60 text-xs font-medium mb-8">전체 대상자 중 협상 완료 인원</p>
+                  
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-5xl font-black tracking-tighter">
+                      {Math.round((negotiations.filter(n => n.status === 'final_agreement').length / (employees.length || 1)) * 100)}
+                    </span>
+                    <span className="text-xl font-bold opacity-60">%</span>
+                  </div>
+                  
+                  <div className="space-y-4 mt-8">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40">
+                      <span>완료 인원</span>
+                      <span>{negotiations.filter(n => n.status === 'final_agreement').length} / {employees.length}명</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(negotiations.filter(n => n.status === 'final_agreement').length / (employees.length || 1)) * 100}%` }}
+                        className="h-full bg-[var(--color-accent-1)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <TrendingUp size={120} className="absolute -bottom-4 -right-4 text-white/5 rotate-12 group-hover:scale-110 transition-transform duration-500" />
+              </div>
+            </div>
+
           </div>
         </div>
       )}
