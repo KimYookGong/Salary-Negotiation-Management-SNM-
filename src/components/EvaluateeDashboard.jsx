@@ -66,6 +66,7 @@ const formatInputCurrency = (value) => {
 
 const EvaluateeDashboard = ({ profile, currentYear }) => {
   const [negotiation, setNegotiation] = useState(null);
+  const [masterSalary, setMasterSalary] = useState(0); // 마스터 데이터 연봉 추가
   const [history, setHistory] = useState([]); // 히스토리 상태 추가
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -103,7 +104,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
         setFormData({
           hopeSalary: data.evaluatee_proposal || '',
           rating: data.performance_rating || profile?.performance_rating || '',
-          isPromoted: data.promotion_request === true || data.promotion_request === 'true',
+          isPromoted: data.promotion_request === true || data.promotion_request === 'true' || data.promotion_request === '1',
           jd: data.jd || '',
           achievement: data.reason || ''
         });
@@ -116,6 +117,19 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
           jd: '', 
           achievement: '' 
         }));
+      }
+    }
+
+    // 연봉 정보 보충을 위한 마스터 데이터 조회
+    if (profile.employee_id) {
+      const { data: empData } = await supabase
+        .from('employees')
+        .select('salary')
+        .eq('employee_id', profile.employee_id)
+        .maybeSingle();
+      
+      if (empData?.salary) {
+        setMasterSalary(empData.salary);
       }
     }
 
@@ -240,9 +254,9 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
             <StatusBadge status={negotiation.status} />
           </div>
 
-          {/* 현재 연봉 보정 로직 (프로필에 없으면 협상 데이터에서 가져옴) */}
+          {/* 현재 연봉 보정 로직 (프로필 -> 마스터데이터 -> 협상데이터 순으로 확인) */}
           {(() => {
-            const actualCurrentSalary = profile?.current_salary || negotiation.current_salary || 0;
+            const actualCurrentSalary = profile?.current_salary || masterSalary || negotiation.current_salary || 0;
             const hopeProposal = Number(negotiation.evaluatee_proposal || 0);
             const evalProposal = Number(negotiation.evaluator_proposal || 0);
             
@@ -275,12 +289,19 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                             : '-%'}
                         </p>
                       </div>
-                      {negotiation.performance_rating && (
-                        <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
-                          <span className="text-sm font-bold text-gray-500">희망 등급</span>
-                          <span className="px-3 py-1 bg-white border border-gray-200 rounded-lg text-sm font-black text-gray-700">{negotiation.performance_rating} 등급</span>
+                      
+                      <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-200/50">
+                        <div className="bg-white p-3 rounded-xl border border-gray-100">
+                          <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
+                          <p className="text-sm font-black text-gray-700">{negotiation.performance_rating} 등급</p>
                         </div>
-                      )}
+                        <div className="bg-white p-3 rounded-xl border border-gray-100">
+                          <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
+                          <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                            {negotiation.promotion_request ? '요청함' : '미요청'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
