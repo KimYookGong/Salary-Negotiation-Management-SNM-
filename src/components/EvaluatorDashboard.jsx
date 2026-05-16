@@ -1112,56 +1112,88 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-                      {/* 요구 사항 상세 */}
-                      <div className="space-y-6">
-                        <section>
-                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
-                            <Wallet size={14} className="text-[var(--color-primary)]" /> 요구 연봉 상세
-                          </h4>
-                          <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-xs font-bold text-gray-400">현재 연봉</span>
-                              <p className="text-lg font-bold text-gray-600">
-                                {formatCurrencySimple(actualCurrentSalary)}
-                              </p>
+                      {/* 사원 요구 사항 - 요구 연봉이 있을 때만 표시 */}
+                      {hopeProposal > 0 ? (
+                        <div className="space-y-6">
+                          <section>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                              <Wallet size={14} className="text-[var(--color-primary)]" /> 요구 연봉 상세
+                            </h4>
+                            <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
+                              <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-400">현재 연봉</span>
+                                <p className="text-lg font-bold text-gray-600">
+                                  {formatCurrencySimple(actualCurrentSalary)}
+                                </p>
+                              </div>
+                              <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
+                                <span className="text-xs font-bold text-gray-400">희망 연봉</span>
+                                <p className="text-2xl font-black text-[var(--color-primary)]">
+                                  {formatCurrencySimple(hopeProposal)}
+                                </p>
+                              </div>
+                              <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
+                                <span className="text-xs font-bold text-gray-400">현재 대비 인상액</span>
+                                <p className="text-sm font-black text-[var(--color-primary)]">
+                                  {formatCurrencySimple(hopeProposal - actualCurrentSalary)}
+                                </p>
+                              </div>
+                              <div className="flex justify-between items-center pt-1">
+                                <span className="text-xs font-bold text-gray-400">현재 대비 인상률</span>
+                                <p className="text-sm font-black text-[var(--color-secondary)]">
+                                  {actualCurrentSalary > 0 
+                                    ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` 
+                                    : '-%'}
+                                </p>
+                              </div>
                             </div>
-                            <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
-                              <span className="text-xs font-bold text-gray-400">희망 연봉</span>
-                              <p className="text-2xl font-black text-[var(--color-primary)]">
-                                {formatCurrencySimple(hopeProposal)}
-                              </p>
-                            </div>
-                            <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
-                              <span className="text-xs font-bold text-gray-400">현재 대비 인상률</span>
-                              <p className="text-sm font-black text-[var(--color-secondary)]">
-                                {actualCurrentSalary > 0 
-                                  ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` 
-                                  : '-%'}
-                              </p>
-                            </div>
-                          </div>
-                        </section>
+                          </section>
 
-                        <section>
-                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
-                            <FileText size={14} className="text-[var(--color-primary)]" /> 직무기술서 (JD)
-                          </h4>
-                          <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px]">
-                            <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
-                              {selectedNegotiation.jd || '등록된 내용이 없습니다.'}
-                            </p>
+                          <section>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                              <FileText size={14} className="text-[var(--color-primary)]" /> 직무기술서 (JD)
+                            </h4>
+                            <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px]">
+                              <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
+                                {selectedNegotiation.jd || '등록된 내용이 없습니다.'}
+                              </p>
+                            </div>
+                          </section>
+                        </div>
+                      ) : (
+                        /* 사원 요구안이 없을 때 표시할 안내 영역 (선택사항) */
+                        <div className="space-y-6">
+                          <section>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                              <Wallet size={14} className="text-gray-300" /> 사원 정보
+                            </h4>
+                            <div className="p-8 bg-gray-50/50 rounded-[32px] border border-dashed border-gray-200 flex flex-col items-center justify-center h-[200px] text-center">
+                              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-200 mb-4 shadow-sm">
+                                <Clock size={24} />
+                              </div>
+                              <p className="text-sm font-bold text-gray-400 mb-1">사원 요구안 대기 중</p>
+                              <p className="text-[10px] text-gray-300 font-medium">사원이 아직 요구안을 제출하지 않았습니다.</p>
+                            </div>
+                          </section>
+                          <div className="p-6 bg-gray-50/30 rounded-3xl border border-gray-100">
+                             <div className="flex justify-between items-center">
+                                <span className="text-xs font-bold text-gray-400">현재 연봉 기준</span>
+                                <p className="text-lg font-bold text-gray-600">
+                                  {formatCurrencySimple(actualCurrentSalary)}
+                                </p>
+                              </div>
                           </div>
-                        </section>
-                      </div>
+                        </div>
+                      )}
 
-                      {/* 인사팀 제안 및 성과 요약 */}
+                      {/* 인사팀 제안 현황 - 제안이 있을 때 항상 표시 */}
                       <div className="space-y-6">
                         <section>
                           <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
                             <TrendingUp size={14} className="text-[var(--color-secondary)]" /> 인사팀 제안 현황
                           </h4>
                           {evalProposal > 0 ? (
-                            <div className="p-6 bg-[var(--color-primary)]/5 rounded-3xl border border-[var(--color-primary)]/10 space-y-4">
+                            <div className="p-6 bg-[var(--color-primary)]/5 rounded-3xl border border-[var(--color-primary)]/10 space-y-4 shadow-sm">
                               <div className="flex justify-between items-end">
                                 <span className="text-xs font-bold text-gray-500">제안 연봉</span>
                                 <p className="text-2xl font-black text-[var(--color-secondary)]">
@@ -1190,16 +1222,19 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                           )}
                         </section>
 
-                        <section>
-                          <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
-                            <MessageSquare size={14} className="text-[var(--color-primary)]" /> 인상 근거 및 성과 요약
-                          </h4>
-                          <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px] italic">
-                            <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
-                              "{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"
-                            </p>
-                          </div>
-                        </section>
+                        {/* 인상 근거 - 사원 요구안이 있을 때만 표시 (인사팀 제안 시에는 보통 코멘트가 없음) */}
+                        {selectedNegotiation.reason && (
+                          <section>
+                            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                              <MessageSquare size={14} className="text-[var(--color-primary)]" /> 인상 근거 및 성과 요약
+                            </h4>
+                            <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px] italic shadow-sm">
+                              <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
+                                "{selectedNegotiation.reason}"
+                              </p>
+                            </div>
+                          </section>
+                        )}
                       </div>
                     </div>
 
