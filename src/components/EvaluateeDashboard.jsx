@@ -120,16 +120,19 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       }
     }
 
-    // 연봉 정보 보충을 위한 마스터 데이터 조회
-    if (profile.employee_id) {
-      const { data: empData } = await supabase
-        .from('employees')
+    // 연봉 정보 보충을 위한 히스토리 데이터 조회 (프로필에 연봉이 없는 경우)
+    if (profile.employee_id && (profile.current_salary === 0 || !profile.current_salary)) {
+      const { data: lastYearData } = await supabase
+        .from('employee_history')
         .select('salary')
         .eq('employee_id', profile.employee_id)
+        .lt('year', currentYear)
+        .order('year', { ascending: false })
+        .limit(1)
         .maybeSingle();
       
-      if (empData?.salary) {
-        setMasterSalary(empData.salary);
+      if (lastYearData?.salary) {
+        setMasterSalary(lastYearData.salary);
       }
     }
 
