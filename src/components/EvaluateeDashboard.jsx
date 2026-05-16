@@ -264,128 +264,145 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
             const evalProposal = Number(negotiation.evaluator_proposal || 0);
             
             return (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* 왼쪽: 나의 요구안 */}
-                <div className="space-y-4">
-                  <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">나의 요구안 상세</p>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-gray-400">현재 연봉</span>
-                        <p className="text-sm font-black text-gray-700">{formatCurrency(actualCurrentSalary)}</p>
+              <div className="space-y-6">
+                {/* 3단 통합 비교 카드 */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                    
+                    {/* 1. 현재 상태 (기준) */}
+                    <div className="p-8 bg-gray-50/50">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">현재 상태 (기준)</p>
+                      <div className="space-y-6">
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 mb-1">현재 연봉</p>
+                          <p className="text-xl font-black text-gray-700">{formatCurrency(actualCurrentSalary)}</p>
+                        </div>
+                        <div className="pt-6 border-t border-gray-200/50">
+                          <p className="text-xs font-bold text-gray-400 mb-2">현재 직급 / 등급</p>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-gray-600">{profile?.position}</span>
+                            <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-gray-600">{profile?.performance_rating || '-'} 등급</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
-                        <span className="text-sm font-bold text-gray-500">희망 연봉</span>
-                        <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(hopeProposal)}</p>
+                    </div>
+
+                    {/* 2. 나의 요구안 */}
+                    <div className="p-8 relative">
+                      <p className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest mb-6">나의 요구안 상세</p>
+                      <div className="space-y-6">
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 mb-1">희망 연봉</p>
+                          <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(hopeProposal)}</p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-[10px] font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md">
+                              +{formatCurrency(hopeProposal - actualCurrentSalary)} 인상
+                            </span>
+                            <span className="text-[10px] font-black text-[var(--color-secondary)] bg-[var(--color-secondary)]/10 px-2 py-0.5 rounded-md">
+                              {actualCurrentSalary > 0 ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` : '-%'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="pt-6 border-t border-gray-100">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
+                              <p className="text-sm font-black text-gray-900">{negotiation.performance_rating || '-'} 등급</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
+                              <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                                {negotiation.promotion_request ? '요청함' : '미요청'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center pt-1">
-                        <span className="text-[10px] font-bold text-gray-400">현재 대비 인상액</span>
-                        <p className="text-xs font-black text-[var(--color-primary)]">
-                          {actualCurrentSalary > 0 ? `+${formatCurrency(hopeProposal - actualCurrentSalary)}` : `+${formatCurrency(hopeProposal)} (기준연봉 0)`}
-                        </p>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] font-bold text-gray-400">현재 대비 인상률</span>
-                        <p className="text-xs font-black text-[var(--color-secondary)]">
-                          {actualCurrentSalary > 0 
-                            ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` 
-                            : '-%'}
-                        </p>
-                      </div>
+                    </div>
+
+                    {/* 3. 평가자 제안 (오피셜) */}
+                    <div className={`p-8 relative transition-all ${evalProposal > 0 ? 'bg-[var(--color-primary)]/5' : 'bg-gray-50/30'}`}>
+                      {evalProposal > 0 && (
+                        <div className="absolute top-4 right-4">
+                          <div className="bg-[var(--color-primary)] text-white text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-tighter shadow-lg shadow-primary/20 animate-pulse">OFFICIAL</div>
+                        </div>
+                      )}
                       
-                      <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-200/50">
-                        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                          <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
-                          <p className="text-sm font-black text-gray-900">{negotiation.performance_rating || '-'} 등급</p>
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">평가자 제안 상세</p>
+                      
+                      {evalProposal > 0 ? (
+                        <div className="space-y-6">
+                          <div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">제안 연봉</p>
+                            <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(evalProposal)}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] font-black text-[var(--color-primary)] bg-white border border-[var(--color-primary)]/20 px-2 py-0.5 rounded-md">
+                                +{formatCurrency(evalProposal - actualCurrentSalary)}
+                              </span>
+                              <span className="text-[10px] font-black text-[var(--color-secondary)] bg-white border border-[var(--color-secondary)]/20 px-2 py-0.5 rounded-md">
+                                {actualCurrentSalary > 0 ? `+${(((evalProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` : '-%'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="pt-6 border-t border-[var(--color-primary)]/10">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase mb-1">확정 등급</p>
+                                <p className="text-sm font-black text-gray-900">{negotiation.performance_rating} 등급</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase mb-1">직급 변동</p>
+                                <p className="text-sm font-black text-gray-900">{negotiation.position || profile?.position}</p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="bg-white p-3 rounded-xl border border-gray-100 shadow-sm">
-                          <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
-                          <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
-                            {negotiation.promotion_request ? '요청함' : '미요청'}
-                          </p>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center py-4 text-gray-400">
+                          <Clock size={24} className="mb-2 opacity-20" />
+                          <p className="text-xs font-bold text-center leading-relaxed">평가자가 제안을<br/>검토 중입니다.</p>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </div>
-                </div>
 
-                {/* 오른쪽: 평가자 제안 (제안이 있는 경우만 표시) */}
-                <div className="space-y-4">
-                  {evalProposal > 0 ? (
-                    <div className="p-6 bg-[var(--color-primary)]/5 rounded-2xl border-2 border-[var(--color-primary)] shadow-lg shadow-primary/5 relative overflow-hidden h-full">
-                      <div className="absolute top-0 right-0 p-2">
-                        <div className="bg-[var(--color-primary)] text-white text-[9px] font-black px-2 py-1 rounded-bl-xl uppercase tracking-tighter">Official Proposal</div>
-                      </div>
-                      
-                      <p className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <CheckCircle size={14} />
-                        평가자 제안 상세
-                      </p>
-                      
-                      <div className="space-y-4">
-                        <div className="flex justify-between items-end">
-                          <span className="text-sm font-bold text-gray-600">제안 연봉</span>
-                          <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(evalProposal)}</p>
+                  {/* 검토 의견 (제안이 있는 경우만 하단에 길게 표시) */}
+                  {evalProposal > 0 && negotiation.evaluator_comment && (
+                    <div className="px-8 py-6 bg-white border-t border-gray-100">
+                      <div className="flex gap-4">
+                        <div className="shrink-0 w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                          <MessageSquare size={14} className="text-gray-400" />
                         </div>
-
-                        <div className="flex justify-between items-center pt-2 border-t border-[var(--color-primary)]/10">
-                          <span className="text-[10px] font-bold text-gray-500">현재 대비 인상액</span>
-                          <p className="text-xs font-black text-[var(--color-primary)]">
-                            {actualCurrentSalary > 0 ? `+${formatCurrency(evalProposal - actualCurrentSalary)}` : `+${formatCurrency(evalProposal)} (기준연봉 0)`}
+                        <div className="space-y-1">
+                          <p className="text-[10px] font-black text-gray-400 uppercase">인사팀 검토 의견</p>
+                          <p className="text-sm text-gray-700 leading-relaxed font-medium italic">
+                            "{negotiation.evaluator_comment}"
                           </p>
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-bold text-gray-500">현재 대비 인상률</span>
-                          <p className="text-xs font-black text-[var(--color-secondary)]">
-                            {actualCurrentSalary > 0 
-                              ? `+${(((evalProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` 
-                              : '-%'}
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--color-primary)]/10">
-                          <div className="bg-white p-3 rounded-xl border border-[var(--color-primary)]/10">
-                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">확정 등급</p>
-                            <p className="text-sm font-black text-gray-900">{negotiation.performance_rating} 등급</p>
-                          </div>
-                          <div className="bg-white p-3 rounded-xl border border-[var(--color-primary)]/10">
-                            <p className="text-[9px] font-black text-gray-400 uppercase mb-1">직급 변동</p>
-                            <p className="text-sm font-black text-gray-900">{negotiation.position || profile?.position}</p>
-                          </div>
-                        </div>
-
-                        {negotiation.evaluator_comment && (
-                          <div className="mt-4 p-4 bg-white/60 rounded-xl border border-[var(--color-primary)]/5">
-                            <p className="text-[9px] font-black text-gray-400 uppercase mb-2">검토 의견</p>
-                            <p className="text-sm text-gray-700 leading-relaxed italic font-medium">
-                              "{negotiation.evaluator_comment}"
-                            </p>
-                          </div>
-                        )}
                       </div>
-                    </div>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center p-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200 text-gray-400 min-h-[250px]">
-                      <Clock size={32} className="mb-3 opacity-20" />
-                      <p className="text-sm font-bold text-center">평가자가 제안을 검토 중입니다.<br/><span className="text-xs font-normal">곧 공식 제안이 도착할 예정입니다.</span></p>
                     </div>
                   )}
                 </div>
+
+                {/* 하단 액션 버튼 */}
+                {evalProposal > 0 && (
+                  <div className="pt-4">
+                    <button 
+                      onClick={() => alert('최종 합의 기능은 준비 중입니다.')}
+                      className="w-full py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#014421] text-white text-lg font-black rounded-3xl shadow-2xl shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-3 group"
+                    >
+                      <Check size={24} className="group-hover:scale-110 transition-transform" />
+                      제안 수락 및 최종 합의 완료하기
+                    </button>
+                    <p className="text-center mt-4 text-[11px] font-bold text-gray-400">
+                      최종 합의를 누르시면 이번 연도 연봉 협상이 확정되며 수정이 불가능합니다.
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })()}
-
-          {negotiation.evaluator_proposal && (
-            <div className="flex gap-4 mt-8 pt-8 border-t border-gray-100">
-              <button 
-                onClick={() => alert('최종 합의 기능은 준비 중입니다.')}
-                className="flex-1 py-4 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-              >
-                <Check size={20} />
-                제안 수락 및 최종 합의
-              </button>
-            </div>
-          )}
 
         </motion.div>
       ) : (
