@@ -81,8 +81,12 @@ function App() {
         setProfile(profileData);
         const role = profileData.role || 'evaluatee';
         setUserRole(role);
+        
+        // 역할에 따른 초기 탭 설정
         if (role === 'evaluatee') {
           setCurrentTab('negotiation');
+        } else if (role === 'evaluator') {
+          setCurrentTab('dashboard');
         }
       }
 
@@ -180,10 +184,11 @@ function App() {
   // Sidebar 액션
   useEffect(() => {
     if (currentTab === 'switch-role') {
-      setUserRole(prev => prev === 'evaluator' ? 'evaluatee' : 'evaluator');
-      setCurrentTab('negotiation');
+      const nextRole = userRole === 'evaluator' ? 'evaluatee' : 'evaluator';
+      setUserRole(nextRole);
+      setCurrentTab(nextRole === 'evaluator' ? 'dashboard' : 'negotiation');
     }
-  }, [currentTab]);
+  }, [currentTab, userRole]);
 
   const renderContent = () => {
     if (!userRole && !loading) {
