@@ -150,11 +150,22 @@ BEGIN
     -- 삭제 또는 업데이트 시 이전 영향력 계산
     IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
         IF OLD.status NOT IN ('rejected', 'cancelled') AND OLD.evaluator_proposal IS NOT NULL THEN
-            -- OLD.current_salary가 0이면 프로필에서 다시 조회 (보정 로직)
+            -- [보정 로직] OLD.current_salary가 0이면 프로필 또는 히스토리에서 조회
             actual_salary := COALESCE(NULLIF(OLD.current_salary, 0), 0);
             IF actual_salary = 0 THEN
                 SELECT current_salary INTO actual_salary FROM profiles WHERE id = OLD.evaluatee_id;
             END IF;
+            
+            -- 여전히 0이라면 히스토리 테이블에서 전년도 연봉 조회
+            IF COALESCE(actual_salary, 0) = 0 THEN
+                SELECT salary INTO actual_salary 
+                FROM employee_history 
+                WHERE employee_id = OLD.employee_id 
+                  AND year < OLD.year 
+                ORDER BY year DESC 
+                LIMIT 1;
+            END IF;
+            
             old_impact := OLD.evaluator_proposal::BIGINT - COALESCE(actual_salary, 0);
         END IF;
         target_year := OLD.year;
@@ -164,10 +175,20 @@ BEGIN
     -- 삽입 또는 업데이트 시 새로운 영향력 계산
     IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
         IF NEW.status NOT IN ('rejected', 'cancelled') AND NEW.evaluator_proposal IS NOT NULL THEN
-            -- NEW.current_salary가 0이면 프로필에서 다시 조회 (보정 로직)
+            -- [보정 로직] NEW.current_salary가 0이면 프로필 또는 히스토리에서 조회
             actual_salary := COALESCE(NULLIF(NEW.current_salary, 0), 0);
             IF actual_salary = 0 THEN
                 SELECT current_salary INTO actual_salary FROM profiles WHERE id = NEW.evaluatee_id;
+            END IF;
+            
+            -- 여전히 0이라면 히스토리 테이블에서 전년도 연봉 조회
+            IF COALESCE(actual_salary, 0) = 0 THEN
+                SELECT salary INTO actual_salary 
+                FROM employee_history 
+                WHERE employee_id = NEW.employee_id 
+                  AND year < NEW.year 
+                ORDER BY year DESC 
+                LIMIT 1;
             END IF;
             
             -- NEW 레코드의 current_salary 값도 실제 값으로 업데이트하여 저장
