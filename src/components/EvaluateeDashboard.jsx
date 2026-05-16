@@ -82,11 +82,16 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
     if (!profile) return;
     setLoading(true);
     
-    // 현재 연도 협상 조회
-    const { data, error } = await supabase
-      .from('negotiations')
-      .select('*')
-      .eq('evaluatee_id', profile.id)
+    // 현재 연도 협상 조회 (ID 또는 사번으로 조회)
+    let query = supabase.from('negotiations').select('*');
+    
+    if (profile.employee_id) {
+      query = query.or(`evaluatee_id.eq.${profile.id},employee_id.eq.${profile.employee_id}`);
+    } else {
+      query = query.eq('evaluatee_id', profile.id);
+    }
+
+    const { data, error } = await query
       .eq('year', currentYear)
       .maybeSingle();
 

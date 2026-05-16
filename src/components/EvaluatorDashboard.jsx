@@ -626,9 +626,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     const { data: existingNeg } = await supabase
       .from('negotiations')
       .select('id')
-      .eq('evaluatee_name', selectedEmployeeForSalary.full_name)
-      .eq('year', currentYear) // 해당 연도 협상만 확인
-      .single();
+      .or(`employee_id.eq.${selectedEmployeeForSalary.employee_id},evaluatee_name.eq.${selectedEmployeeForSalary.full_name}`)
+      .eq('year', currentYear)
+      .maybeSingle();
 
     if (existingNeg) {
       await supabase.from('negotiations').update(payload).eq('id', existingNeg.id);
