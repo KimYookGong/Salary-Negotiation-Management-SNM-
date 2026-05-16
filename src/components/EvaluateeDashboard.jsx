@@ -244,11 +244,29 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
             {/* 왼쪽: 나의 요구안 */}
             <div className="space-y-4">
               <div className="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">나의 요구안</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">나의 요구안 상세</p>
                 <div className="space-y-4">
-                  <div className="flex justify-between items-end">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-400">현재 연봉</span>
+                    <p className="text-sm font-bold text-gray-600">{formatCurrency(profile?.current_salary)}</p>
+                  </div>
+                  <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
                     <span className="text-sm font-bold text-gray-500">희망 연봉</span>
-                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatInputCurrency(negotiation.evaluatee_proposal)}원</p>
+                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(negotiation.evaluatee_proposal)}</p>
+                  </div>
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-[10px] font-bold text-gray-400">현재 대비 인상액</span>
+                    <p className="text-xs font-black text-[var(--color-primary)]">
+                      +{formatCurrency(Number(negotiation.evaluatee_proposal) - (profile?.current_salary || 0))}
+                    </p>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-bold text-gray-400">현재 대비 인상률</span>
+                    <p className="text-xs font-black text-[var(--color-secondary)]">
+                      {profile?.current_salary > 0 
+                        ? `+${(((Number(negotiation.evaluatee_proposal) - profile.current_salary) / profile.current_salary) * 100).toFixed(1)}%` 
+                        : '-%'}
+                    </p>
                   </div>
                   {negotiation.performance_rating && (
                     <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
@@ -277,6 +295,21 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                     <div className="flex justify-between items-end">
                       <span className="text-sm font-bold text-gray-600">제안 연봉</span>
                       <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(negotiation.evaluator_proposal)}</p>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-[var(--color-primary)]/10">
+                      <span className="text-[10px] font-bold text-gray-500">현재 대비 인상액</span>
+                      <p className="text-xs font-black text-[var(--color-primary)]">
+                        +{formatCurrency(Number(negotiation.evaluator_proposal) - (profile?.current_salary || 0))}
+                      </p>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold text-gray-500">현재 대비 인상률</span>
+                      <p className="text-xs font-black text-[var(--color-secondary)]">
+                        {profile?.current_salary > 0 
+                          ? `+${(((Number(negotiation.evaluator_proposal) - profile.current_salary) / profile.current_salary) * 100).toFixed(1)}%` 
+                          : '-%'}
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--color-primary)]/10">
@@ -317,13 +350,6 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
               >
                 <Check size={20} />
                 제안 수락 및 최종 합의
-              </button>
-              <button 
-                onClick={() => alert('추가 근거 제출은 아래 폼을 이용해 주세요.')}
-                className="flex-1 py-4 bg-white text-gray-600 border-2 border-gray-100 text-base font-black rounded-2xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
-              >
-                <AlertCircle size={20} />
-                추가 근거 제출 및 역제시
               </button>
             </div>
           )}
