@@ -1065,36 +1065,147 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
       <AnimatePresence>
         {selectedNegotiation && (
-          <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/20 z-40" onClick={() => setSelectedNegotiation(null)} />
-            <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} className="fixed right-0 top-0 h-full w-[500px] bg-white shadow-2xl z-50 overflow-y-auto">
-              <div className="p-10">
-                <div className="flex justify-between items-start mb-10"><div className="flex items-center gap-5"><div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300"><User size={32} /></div><div><h2 className="text-3xl font-black text-gray-900">{selectedNegotiation.evaluatee_name}</h2><div className="flex items-center gap-2 mt-1"><p className="text-sm font-bold text-gray-500">{selectedNegotiation.department} {selectedNegotiation.position}</p>{selectedNegotiation.performance_rating && <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2 py-0.5 rounded-md">{selectedNegotiation.performance_rating}등급</span>}</div></div></div><button onClick={() => setSelectedNegotiation(null)} className="p-2 hover:bg-gray-50 rounded-xl"><X size={24} className="text-gray-400" /></button></div>
-                <div className="space-y-10">
-                  <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><FileText size={14} /> 주요 요구 사항</h4><div className="p-6 bg-gray-50 rounded-3xl border border-gray-100"><p className="text-2xl font-black text-[var(--color-primary)] mb-2">{selectedNegotiation.evaluatee_proposal}</p><p className="text-sm text-gray-500 font-medium">{selectedNegotiation.jd || '직무 상세 정보 없음'}</p></div></section>
-                  {selectedNegotiation.evaluator_proposal && (
-                    <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2"><TrendingUp size={14} /> 인사팀 제안</h4><div className="p-6 bg-blue-50 rounded-3xl border border-blue-100"><p className="text-2xl font-black text-[var(--color-secondary)] mb-1">{formatInputCurrency(selectedNegotiation.evaluator_proposal)}</p><p className="text-xs text-blue-600 font-bold">인상액: {formatCurrencySimple(Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary))}</p></div></section>
-                  )}
-                  <section><h4 className="text-[11px] font-black text-gray-400 uppercase tracking-widest mb-4">인상 근거 및 성과 요약</h4><div className="p-6 bg-white border border-gray-100 rounded-3xl italic text-gray-600 text-sm">"{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"</div></section>
-
-                  {selectedNegotiation.status === 'counter_offer' && (
-                    <div className="grid grid-cols-2 gap-4 pt-6">
-                      <button onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} className="btn btn-primary w-full justify-center py-4 text-sm">즉시 수락 및 합의</button>
-                      <button onClick={() => setIsPopupOpen(true)} className="btn btn-outline w-full justify-center py-4 text-sm">조건 제시</button>
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm" 
+              onClick={() => setSelectedNegotiation(null)} 
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[40px] p-10 w-full max-w-3xl shadow-2xl relative z-10 border border-gray-100 overflow-y-auto max-h-[90vh] custom-scrollbar"
+            >
+              <div className="flex justify-between items-start mb-10">
+                <div className="flex items-center gap-6">
+                  <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center text-gray-300 shadow-inner">
+                    <User size={40} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h2 className="text-3xl font-black text-gray-900">{selectedNegotiation.evaluatee_name}</h2>
+                      {selectedNegotiation.performance_rating && (
+                        <span className="text-[10px] font-black bg-[var(--color-primary)]/10 text-[var(--color-primary)] px-2.5 py-1 rounded-lg uppercase tracking-wider border border-[var(--color-primary)]/5">
+                          {selectedNegotiation.performance_rating}등급
+                        </span>
+                      )}
                     </div>
-                  )}
-                  <div className="pt-6 border-t border-gray-50">
+                    <p className="text-base font-bold text-gray-400">{selectedNegotiation.department} / {selectedNegotiation.position}</p>
+                  </div>
+                </div>
+                <button onClick={() => setSelectedNegotiation(null)} className="p-3 hover:bg-gray-50 rounded-2xl transition-all group">
+                  <X size={24} className="text-gray-300 group-hover:text-gray-600" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                {/* 요구 사항 상세 */}
+                <div className="space-y-6">
+                  <section>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                      <Wallet size={14} className="text-[var(--color-primary)]" /> 요구 연봉 상세
+                    </h4>
+                    <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
+                      <div className="flex justify-between items-end">
+                        <span className="text-xs font-bold text-gray-400">희망 연봉</span>
+                        <p className="text-2xl font-black text-[var(--color-primary)]">
+                          {formatCurrencySimple(selectedNegotiation.evaluatee_proposal)}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
+                        <span className="text-xs font-bold text-gray-400">현재 대비 인상률</span>
+                        <p className="text-sm font-black text-[var(--color-secondary)]">
+                          {selectedNegotiation.current_salary > 0 
+                            ? `+${(((Number(selectedNegotiation.evaluatee_proposal) - Number(selectedNegotiation.current_salary)) / Number(selectedNegotiation.current_salary)) * 100).toFixed(1)}%` 
+                            : '-%'}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                      <FileText size={14} className="text-[var(--color-primary)]" /> 직무기술서 (JD)
+                    </h4>
+                    <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px]">
+                      <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
+                        {selectedNegotiation.jd || '등록된 내용이 없습니다.'}
+                      </p>
+                    </div>
+                  </section>
+                </div>
+
+                {/* 인사팀 제안 및 성과 요약 */}
+                <div className="space-y-6">
+                  <section>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                      <TrendingUp size={14} className="text-[var(--color-secondary)]" /> 인사팀 제안 현황
+                    </h4>
+                    {selectedNegotiation.evaluator_proposal ? (
+                      <div className="p-6 bg-[var(--color-primary)]/5 rounded-3xl border border-[var(--color-primary)]/10 space-y-4">
+                        <div className="flex justify-between items-end">
+                          <span className="text-xs font-bold text-gray-500">제안 연봉</span>
+                          <p className="text-2xl font-black text-[var(--color-secondary)]">
+                            {formatCurrencySimple(selectedNegotiation.evaluator_proposal)}
+                          </p>
+                        </div>
+                        <div className="flex justify-between items-center pt-3 border-t border-[var(--color-primary)]/10">
+                          <span className="text-xs font-bold text-gray-500">인상액</span>
+                          <p className="text-sm font-black text-[var(--color-primary)]">
+                            {formatCurrencySimple(Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary))}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-6 bg-gray-50 rounded-3xl border border-dashed border-gray-200 flex items-center justify-center h-[104px]">
+                        <p className="text-xs font-bold text-gray-300">공식 제안 전입니다.</p>
+                      </div>
+                    )}
+                  </section>
+
+                  <section>
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2 px-1">
+                      <MessageSquare size={14} className="text-[var(--color-primary)]" /> 인상 근거 및 성과 요약
+                    </h4>
+                    <div className="p-6 bg-white border border-gray-100 rounded-3xl min-h-[100px] italic">
+                      <p className="text-sm text-gray-600 font-medium leading-relaxed whitespace-pre-wrap">
+                        "{selectedNegotiation.reason || '입력된 근거가 없습니다.'}"
+                      </p>
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {selectedNegotiation.status === 'counter_offer' && (
+                  <div className="grid grid-cols-2 gap-4">
                     <button 
-                      onClick={() => handleDeleteNegotiation(selectedNegotiation.id)}
-                      className="w-full py-4 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2"
+                      onClick={() => handleStatusUpdate(selectedNegotiation.id, 'final_agreement')} 
+                      className="py-5 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                     >
-                      <X size={18} /> 제안 취소 및 평가 초기화
+                      <Check size={20} /> 즉시 수락 및 합의
+                    </button>
+                    <button 
+                      onClick={() => setIsPopupOpen(true)} 
+                      className="py-5 bg-white text-gray-600 border-2 border-gray-100 text-base font-black rounded-2xl hover:bg-gray-50 transition-all"
+                    >
+                      조건 제시
                     </button>
                   </div>
+                )}
+                
+                <div className="pt-6 border-t border-gray-50">
+                  <button 
+                    onClick={() => handleDeleteNegotiation(selectedNegotiation.id)}
+                    className="w-full py-4 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all flex items-center justify-center gap-2 opacity-60 hover:opacity-100"
+                  >
+                    <X size={18} /> 제안 취소 및 평가 초기화
+                  </button>
                 </div>
               </div>
             </motion.div>
-          </>
+          </div>
         )}
       </AnimatePresence>
 
