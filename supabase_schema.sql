@@ -267,23 +267,31 @@ BEGIN
     -- 2. 제안 취소 또는 삭제 (DELETE 또는 상태가 final_agreement에서 다른 것으로 변경)
     IF (TG_OP = 'DELETE') OR (TG_OP = 'UPDATE' AND OLD.status = 'final_agreement' AND NEW.status <> 'final_agreement') THEN
         IF (TG_OP = 'DELETE' AND OLD.status = 'final_agreement') OR (TG_OP = 'UPDATE') THEN
-            -- OLD 데이터를 기준으로 복구 작업 진행
-            SELECT employee_id INTO target_emp_id FROM profiles WHERE id = OLD.evaluatee_id;
+            -- 사번 정보 가져오기 (협상 데이터 자체 정보 우선, 없으면 프로필 참조)
+            target_emp_id := COALESCE(OLD.employee_id, (SELECT employee_id FROM profiles WHERE id = OLD.evaluatee_id));
             
             IF target_emp_id IS NOT NULL THEN
-                -- 해당 연도의 히스토리 삭제
+                -- 1. 해당 연도의 히스토리 삭제
                 DELETE FROM employee_history WHERE employee_id = target_emp_id AND year = OLD.year;
 
-                -- 전년도 데이터 조회하여 프로필 복구
+                -- 2. 전년도 데이터 조회하여 프로필 복구
                 SELECT * INTO prev_history FROM employee_history 
                 WHERE employee_id = target_emp_id AND year < OLD.year 
                 ORDER BY year DESC LIMIT 1;
 
                 IF prev_history IS NOT NULL THEN
-                    UPDATE profiles SET current_salary = prev_history.salary, performance_rating = prev_history.performance_rating, position = prev_history.position, updated_at = NOW()
+                    UPDATE profiles SET 
+                        current_salary = prev_history.salary, 
+                        performance_rating = prev_history.performance_rating, 
+                        position = prev_history.position, 
+                        updated_at = NOW()
                     WHERE id = OLD.evaluatee_id;
                 ELSE
-                    UPDATE profiles SET current_salary = 0, performance_rating = '-', updated_at = NOW()
+                    -- 전년도 데이터도 없는 경우 초기화
+                    UPDATE profiles SET 
+                        current_salary = 0, 
+                        performance_rating = '-', 
+                        updated_at = NOW()
                     WHERE id = OLD.evaluatee_id;
                 END IF;
             END IF;
