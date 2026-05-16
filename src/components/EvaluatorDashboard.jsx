@@ -392,10 +392,10 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
   );
 };
 
-  );
-};
-
 const NotificationPopup = ({ isOpen, onClose, notifications }) => {
+
+
+
   if (!isOpen) return null;
 
   return (
