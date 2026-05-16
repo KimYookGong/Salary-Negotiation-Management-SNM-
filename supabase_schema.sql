@@ -136,20 +136,26 @@ CREATE TRIGGER trg_sync_total_budget
 AFTER INSERT OR UPDATE OR DELETE ON department_budgets
 FOR EACH ROW EXECUTE FUNCTION sync_total_company_budget();
 
--- 8. 트리거 함수: 협상 상태에 따른 예산 자동 동기화
+-- 8. 트리거 함수: 협상 진행 시 예산 동기화 (인상액만큼만 반영)
 CREATE OR REPLACE FUNCTION sync_negotiation_budget_auto()
 RETURNS TRIGGER AS $$
 DECLARE
     old_impact BIGINT := 0;
     new_impact BIGINT := 0;
     diff BIGINT := 0;
-    target_year INTEGER;
-    target_dept department_type;
+    target_year INT;
+    target_dept TEXT;
+    actual_salary BIGINT;
 BEGIN
     -- 삭제 또는 업데이트 시 이전 영향력 계산
     IF (TG_OP = 'UPDATE' OR TG_OP = 'DELETE') THEN
-        IF OLD.status NOT IN ('rejected', 'cancelled') AND OLD.evaluator_proposal IS NOT NULL AND OLD.current_salary IS NOT NULL THEN
-            old_impact := OLD.evaluator_proposal::BIGINT - OLD.current_salary::BIGINT;
+        IF OLD.status NOT IN ('rejected', 'cancelled') AND OLD.evaluator_proposal IS NOT NULL THEN
+            -- OLD.current_salary가 0이면 프로필에서 다시 조회 (보정 로직)
+            actual_salary := COALESCE(NULLIF(OLD.current_salary, 0), 0);
+            IF actual_salary = 0 THEN
+                SELECT current_salary INTO actual_salary FROM profiles WHERE id = OLD.evaluatee_id;
+            END IF;
+            old_impact := OLD.evaluator_proposal::BIGINT - COALESCE(actual_salary, 0);
         END IF;
         target_year := OLD.year;
         target_dept := OLD.department;
@@ -157,7 +163,15 @@ BEGIN
 
     -- 삽입 또는 업데이트 시 새로운 영향력 계산
     IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
-        IF NEW.status NOT IN ('rejected', 'cancelled') AND NEW.evaluator_proposal IS NOT NULL AND NEW.current_salary IS NOT NULL THEN
+        IF NEW.status NOT IN ('rejected', 'cancelled') AND NEW.evaluator_proposal IS NOT NULL THEN
+            -- NEW.current_salary가 0이면 프로필에서 다시 조회 (보정 로직)
+            actual_salary := COALESCE(NULLIF(NEW.current_salary, 0), 0);
+            IF actual_salary = 0 THEN
+                SELECT current_salary INTO actual_salary FROM profiles WHERE id = NEW.evaluatee_id;
+            END IF;
+            
+            -- NEW 레코드의 current_salary 값도 실제 값으로 업데이트하여 저장
+            NEW.current_salary := COALESCE(actual_salary, 0);
             new_impact := NEW.evaluator_proposal::BIGINT - NEW.current_salary::BIGINT;
         END IF;
         target_year := NEW.year;
@@ -256,4 +270,3 @@ FOR EACH ROW EXECUTE FUNCTION sync_final_agreement_to_master();
 -- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS year INTEGER NOT NULL DEFAULT 2026;
 -- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS jd TEXT;
 -- ALTER TABLE negotiations ADD COLUMN IF NOT EXISTS reason TEXT;
-
