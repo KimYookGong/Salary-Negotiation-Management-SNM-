@@ -326,26 +326,29 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center transition-all ${
-                        formData.isPromoted ? 'bg-[var(--color-secondary)] text-white' : 'bg-white text-gray-200 border border-gray-200'
+                        formData.isPromoted ? 'bg-[var(--color-secondary)] text-white' : 'bg-white text-gray-200 border border-gray-200 shadow-inner'
                       }`}>
                         <Check size={14} strokeWidth={4} />
                       </div>
-                      <span className={`text-sm font-black transition-colors whitespace-nowrap overflow-hidden text-ellipsis ${formData.isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
-                        {formData.isPromoted ? '승진 요청됨' : '승진 요청하기'}
-                      </span>
-                    </div>
-                    {formData.isPromoted && profile?.position && (
-                      <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2 duration-300 bg-white/50 px-1.5 py-1 rounded-lg shrink-0">
-                        <span className="text-[9px] font-bold text-gray-400 line-through leading-none">{profile.position}</span>
-                        <ChevronRight size={10} className="text-gray-300" />
-                        <span className="text-[11px] font-black text-[var(--color-secondary)] leading-none">
-                          {POSITION_SEQUENCE[POSITION_SEQUENCE.indexOf(profile.position) + 1] || profile.position}
+                      <div className="flex flex-col items-start min-w-0">
+                        <span className={`text-sm font-black transition-colors whitespace-nowrap ${formData.isPromoted ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                          {formData.isPromoted ? '승진 요청됨' : '승진 요청하기'}
                         </span>
+                        {formData.isPromoted && profile?.position && (
+                          <div className="flex items-center gap-1 animate-in fade-in slide-in-from-top-1 duration-300 mt-0.5">
+                            <span className="text-[9px] font-bold text-gray-400 line-through leading-none">{profile.position}</span>
+                            <ChevronRight size={10} className="text-gray-300" />
+                            <span className="text-[10px] font-black text-[var(--color-secondary)] leading-none">
+                              {POSITION_SEQUENCE[POSITION_SEQUENCE.indexOf(profile.position) + 1] || profile.position}
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    )}
+                    </div>
                   </button>
                 </div>
               </div>
+
 
 
               {/* 하단 2개 텍스트영역 */}
