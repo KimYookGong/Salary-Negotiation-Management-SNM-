@@ -240,12 +240,25 @@ BEGIN
             SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
             
             IF target_emp_id IS NOT NULL THEN
+                -- 직급(position) 정보가 없는 경우 프로필에서 가져옴 (NOT NULL 제약 조건 대응)
                 INSERT INTO employee_history (employee_id, year, position, salary, performance_rating)
-                VALUES (target_emp_id, NEW.year, NEW.position, NEW.evaluator_proposal::BIGINT, NEW.performance_rating)
+                VALUES (
+                    target_emp_id, 
+                    NEW.year, 
+                    COALESCE(NEW.position, (SELECT position FROM profiles WHERE id = NEW.evaluatee_id)), 
+                    COALESCE(NEW.evaluator_proposal::BIGINT, 0), 
+                    NEW.performance_rating
+                )
                 ON CONFLICT (employee_id, year) DO UPDATE SET 
-                    salary = EXCLUDED.salary, performance_rating = EXCLUDED.performance_rating, position = EXCLUDED.position;
+                    salary = EXCLUDED.salary, 
+                    performance_rating = EXCLUDED.performance_rating, 
+                    position = EXCLUDED.position;
 
-                UPDATE profiles SET current_salary = NEW.evaluator_proposal::BIGINT, performance_rating = NEW.performance_rating, position = NEW.position, updated_at = NOW()
+                UPDATE profiles SET 
+                    current_salary = COALESCE(NEW.evaluator_proposal::BIGINT, current_salary), 
+                    performance_rating = COALESCE(NEW.performance_rating, performance_rating), 
+                    position = COALESCE(NEW.position, position), 
+                    updated_at = NOW()
                 WHERE id = NEW.evaluatee_id;
             END IF;
         END IF;
