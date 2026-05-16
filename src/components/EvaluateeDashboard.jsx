@@ -65,10 +65,13 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
   const [history, setHistory] = useState([]); // 히스토리 상태 추가
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
+    hopeSalary: '',
+    rating: '',
+    promotionRequest: '',
     jd: '',
-    proposal: '',
-    reason: ''
+    achievement: ''
   });
+
 
   const fetchNegotiation = async () => {
     if (!profile) return;
@@ -88,13 +91,22 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       setNegotiation(data);
       if (data) {
         setFormData({
+          hopeSalary: data.evaluatee_proposal || '',
+          rating: data.performance_rating || profile?.performance_rating || '',
+          promotionRequest: data.promotion_request || '',
           jd: data.jd || '',
-          proposal: data.evaluatee_proposal || '',
-          reason: data.reason || ''
+          achievement: data.reason || ''
         });
       } else {
-        setFormData({ jd: '', proposal: '', reason: '' });
+        setFormData({ 
+          hopeSalary: '', 
+          rating: profile?.performance_rating || '', 
+          promotionRequest: '', 
+          jd: '', 
+          achievement: '' 
+        });
       }
+
     }
 
     // 전체 히스토리 조회 (최근 5년)
@@ -118,18 +130,20 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
     const payload = {
       evaluatee_id: profile.id,
-      employee_id: profile.employee_id, // 사번 추가
+      employee_id: profile.employee_id,
       evaluatee_name: profile.full_name,
       department: profile.department,
       position: profile.position,
-      performance_rating: profile.performance_rating,
-      year: currentYear, // 현재 연도 추가
+      performance_rating: formData.rating,
+      year: currentYear,
       jd: formData.jd,
-      evaluatee_proposal: formData.proposal,
-      reason: formData.reason,
+      evaluatee_proposal: formData.hopeSalary,
+      reason: formData.achievement,
+      promotion_request: formData.promotionRequest,
       status: 'counter_offer',
       updated_at: new Date()
     };
+
 
     let error;
     if (negotiation) {
@@ -244,51 +258,91 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       {/* New Submission Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="card">
-            <h3 className="text-lg mb-6 flex items-center gap-2">
-              <Send size={20} className="text-[var(--color-primary)]" />
-              협상 요구안 작성
-            </h3>
-            <div className="space-y-5">
-              <div>
-                <label className="block text-sm font-semibold mb-2">직무기술서 (JD)</label>
+          <div className="card overflow-hidden">
+            <div className="bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] px-6 py-4 -mx-6 -mt-6 mb-6">
+              <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <Send size={20} />
+                협상 요구안 작성
+              </h3>
+            </div>
+
+            <div className="space-y-6">
+              {/* 상단 3개 필드 그리드 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 연봉</label>
+                  <div className="relative group">
+                    <input 
+                      type="text"
+                      className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-lg font-black text-[var(--color-primary)] shadow-sm"
+                      placeholder="예: 75,000,000"
+                      value={formatInputCurrency(formData.hopeSalary)}
+                      onChange={(e) => setFormData({ ...formData, hopeSalary: e.target.value.replace(/[^0-9]/g, '') })}
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-300">원</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">희망 등급</label>
+                  <select 
+                    className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-lg font-black text-gray-700 shadow-sm appearance-none"
+                    value={formData.rating}
+                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
+                  >
+                    <option value="">등급 선택</option>
+                    {['S', 'A', 'B', 'C', 'D'].map(r => (
+                      <option key={r} value={r}>{r} 등급</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">승진 요청</label>
+                  <input 
+                    type="text"
+                    className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all text-base font-bold text-gray-700 shadow-sm"
+                    placeholder="예: 과장 승진 희망"
+                    value={formData.promotionRequest}
+                    onChange={(e) => setFormData({ ...formData, promotionRequest: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* 하단 2개 텍스트영역 */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">직무기술서 (JD)</label>
                 <textarea 
-                  className="w-full p-3 border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all h-32"
-                  placeholder="현재 담당하고 있는 핵심 업무와 책임을 설명해주세요."
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all h-32 text-sm font-medium leading-relaxed shadow-sm"
+                  placeholder="현재 담당하고 있는 핵심 업무와 책임을 구체적으로 설명해주세요."
                   value={formData.jd}
                   onChange={(e) => setFormData({ ...formData, jd: e.target.value })}
                 ></textarea>
               </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2">희망 조건 (연봉/복지 등)</label>
-                <input 
-                  type="text"
-                  className="w-full p-3 border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                  placeholder="예: 7,500만원 / 재택근무 주 2회"
-                  value={formData.proposal}
-                  onChange={(e) => setFormData({ ...formData, proposal: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold mb-2">인상 근거 및 성과 요약</label>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">성과 요약 및 근거</label>
                 <textarea 
-                  className="w-full p-3 border border-[var(--border-color)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none h-40"
-                  placeholder="지난 기간 동안의 주요 성과와 이 대가를 받아야 하는 이유를 객관적으로 기재해주세요."
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all h-40 text-sm font-medium leading-relaxed shadow-sm"
+                  placeholder="지난 기간 동안의 주요 성과와 지표, 그리고 제안한 조건의 근거를 객관적으로 기재해주세요."
+                  value={formData.achievement}
+                  onChange={(e) => setFormData({ ...formData, achievement: e.target.value })}
                 ></textarea>
               </div>
-              <div className="pt-2">
+
+              <div className="pt-4 border-t border-gray-100">
                 <button 
                   onClick={handleSubmit}
-                  className="btn btn-primary px-8"
+                  className="w-full md:w-auto px-12 py-4 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
-                  요구안 제출하기
+                  <Send size={18} />
+                  요구안 제출 및 전송
                 </button>
               </div>
             </div>
           </div>
         </div>
+
 
         <div className="space-y-6">
           <div className="card ai-insight">
