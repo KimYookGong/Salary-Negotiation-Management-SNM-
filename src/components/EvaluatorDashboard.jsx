@@ -1107,17 +1107,23 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                       <Wallet size={14} className="text-[var(--color-primary)]" /> 요구 연봉 상세
                     </h4>
                     <div className="p-6 bg-gray-50 rounded-3xl border border-gray-100 space-y-4">
-                      <div className="flex justify-between items-end">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-bold text-gray-400">현재 연봉</span>
+                        <p className="text-lg font-bold text-gray-600">
+                          {formatCurrencySimple(selectedNegotiation.current_salary || 0)}
+                        </p>
+                      </div>
+                      <div className="flex justify-between items-end pt-2 border-t border-gray-200/50">
                         <span className="text-xs font-bold text-gray-400">희망 연봉</span>
                         <p className="text-2xl font-black text-[var(--color-primary)]">
-                          {formatCurrencySimple(selectedNegotiation.evaluatee_proposal)}
+                          {formatCurrencySimple(selectedNegotiation.evaluatee_proposal || 0)}
                         </p>
                       </div>
                       <div className="flex justify-between items-center pt-3 border-t border-gray-200/50">
                         <span className="text-xs font-bold text-gray-400">현재 대비 인상률</span>
                         <p className="text-sm font-black text-[var(--color-secondary)]">
                           {selectedNegotiation.current_salary > 0 
-                            ? `+${(((Number(selectedNegotiation.evaluatee_proposal) - Number(selectedNegotiation.current_salary)) / Number(selectedNegotiation.current_salary)) * 100).toFixed(1)}%` 
+                            ? `+${(((Number(selectedNegotiation.evaluatee_proposal || 0) - Number(selectedNegotiation.current_salary)) / Number(selectedNegotiation.current_salary)) * 100).toFixed(1)}%` 
                             : '-%'}
                         </p>
                       </div>
@@ -1151,9 +1157,17 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                           </p>
                         </div>
                         <div className="flex justify-between items-center pt-3 border-t border-[var(--color-primary)]/10">
-                          <span className="text-xs font-bold text-gray-500">인상액</span>
+                          <span className="text-xs font-bold text-gray-500">현재 대비 인상액</span>
                           <p className="text-sm font-black text-[var(--color-primary)]">
-                            {formatCurrencySimple(Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary))}
+                            {formatCurrencySimple(Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary || 0))}
+                          </p>
+                        </div>
+                        <div className="flex justify-between items-center pt-1">
+                          <span className="text-xs font-bold text-gray-500">현재 대비 인상률</span>
+                          <p className="text-sm font-black text-[var(--color-secondary)]">
+                            {selectedNegotiation.current_salary > 0 
+                              ? `+${(((Number(selectedNegotiation.evaluator_proposal) - Number(selectedNegotiation.current_salary)) / Number(selectedNegotiation.current_salary)) * 100).toFixed(1)}%` 
+                              : '-%'}
                           </p>
                         </div>
                       </div>
