@@ -392,7 +392,69 @@ const SalaryNegotiationPopup = ({ isOpen, onClose, onConfirm, employee, budgetDa
   );
 };
 
+  );
+};
+
+const NotificationPopup = ({ isOpen, onClose, notifications }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div 
+        initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
+        className="bg-white rounded-3xl p-10 w-full max-w-2xl shadow-2xl relative z-10 border border-gray-100 max-h-[80vh] flex flex-col"
+      >
+        <div className="flex justify-between items-start mb-8 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-orange-100 rounded-2xl text-orange-600">
+              <AlertCircle size={24} />
+            </div>
+            <h3 className="text-2xl font-black text-gray-900">전체 알림 내역</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
+            <X size={24} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+          {notifications.map((update) => (
+            <div key={update.id} className="flex items-center justify-between p-5 bg-gray-50 rounded-2xl border border-transparent hover:border-gray-100 hover:bg-white transition-all group/item">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm ${statusMap[update.status]?.className}`}>
+                  {statusMap[update.status]?.label.substring(0, 1)}
+                </div>
+                <div>
+                  <p className="text-base font-bold text-gray-900">
+                    <span className="text-[var(--color-primary)]">{update.evaluatee_name}</span>님의 협상 상태가 
+                    <span className="mx-2 px-2.5 py-1 bg-white border border-gray-100 rounded-lg text-xs font-black">{statusMap[update.status]?.label}</span>
+                    (으)로 변경되었습니다.
+                  </p>
+                  <p className="text-xs text-gray-400 font-medium mt-1">{update.department} / {update.position} / {update.year}년</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-black text-gray-400">{formatRelativeTime(update.updated_at)}</p>
+                <p className="text-[10px] text-gray-300 font-medium mt-1">{new Date(update.updated_at).toLocaleString()}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-gray-50 flex justify-end shrink-0">
+          <button onClick={onClose} className="px-8 py-3 bg-gray-900 text-white text-sm font-black rounded-xl hover:bg-gray-800 transition-all">닫기</button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
+
   const [negotiations, setNegotiations] = useState([]);
   const [recentUpdates, setRecentUpdates] = useState([]); // 최근 업데이트 데이터
   const [employees, setEmployees] = useState([]);
@@ -411,6 +473,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [selectedNegotiation, setSelectedNegotiation] = useState(null);
   const [selectedEmployeeForHistory, setSelectedEmployeeForHistory] = useState(null);
+  const [isNotiPopupOpen, setIsNotiPopupOpen] = useState(false);
+
 
   const fetchData = async () => {
     try {
@@ -740,8 +804,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                     </div>
                     <h3 className="text-lg font-black text-gray-900">중요 알림</h3>
                   </div>
-                  <button onClick={() => fetchData()} className="text-xs font-bold text-gray-400 hover:text-[var(--color-primary)] transition-colors">전체보기</button>
+                  <button onClick={() => setIsNotiPopupOpen(true)} className="text-xs font-bold text-gray-400 hover:text-[var(--color-primary)] transition-colors">전체보기</button>
                 </div>
+
                 
                 <div className="space-y-4">
                   {recentUpdates.length > 0 ? (
@@ -778,11 +843,12 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                   <p className="text-white/60 text-xs font-medium mb-8">전체 대상자 중 협상 완료 인원</p>
                   
                   <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-5xl font-black tracking-tighter">
+                    <span className="text-5xl font-black tracking-tighter text-[var(--color-accent-1)]">
                       {Math.round((negotiations.filter(n => n.status === 'final_agreement').length / (employees.length || 1)) * 100)}
                     </span>
-                    <span className="text-xl font-bold opacity-60">%</span>
+                    <span className="text-xl font-bold text-[var(--color-accent-1)] opacity-80">%</span>
                   </div>
+
                   
                   <div className="space-y-4 mt-8">
                     <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40">
@@ -1110,7 +1176,14 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         }}
         onConfirm={handleSalaryProposal}
       />
+
+      <NotificationPopup 
+        isOpen={isNotiPopupOpen} 
+        onClose={() => setIsNotiPopupOpen(false)} 
+        notifications={negotiations} 
+      />
     </div>
+
   );
 };
 
