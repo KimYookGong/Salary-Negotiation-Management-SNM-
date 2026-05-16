@@ -74,6 +74,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
 
   const [negotiation, setNegotiation] = useState(null);
   const [masterSalary, setMasterSalary] = useState(0); // 마스터 데이터 연봉 추가
+  const [lastYearRating, setLastYearRating] = useState('-'); // 직전 등급 추가
   const [history, setHistory] = useState([]); // 히스토리 상태 추가
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState({
@@ -127,19 +128,24 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
       }
     }
 
-    // 연봉 정보 보충을 위한 히스토리 데이터 조회 (프로필에 연봉이 없는 경우)
-    if (profile.employee_id && (profile.current_salary === 0 || !profile.current_salary)) {
+    // 연봉 및 등급 정보 보충을 위한 히스토리 데이터 조회
+    if (profile.employee_id) {
       const { data: lastYearData } = await supabase
         .from('employee_history')
-        .select('salary')
+        .select('salary, performance_rating')
         .eq('employee_id', profile.employee_id)
         .lt('year', currentYear)
         .order('year', { ascending: false })
         .limit(1)
         .maybeSingle();
       
-      if (lastYearData?.salary) {
-        setMasterSalary(lastYearData.salary);
+      if (lastYearData) {
+        if (lastYearData.salary && (profile.current_salary === 0 || !profile.current_salary)) {
+          setMasterSalary(lastYearData.salary);
+        }
+        if (lastYearData.performance_rating) {
+          setLastYearRating(lastYearData.performance_rating);
+        }
       }
     }
 
@@ -280,15 +286,15 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                     <div className="p-8 bg-gray-50/50">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">현재 상태 (기준)</p>
                       <div className="space-y-6">
-                        <div>
+                         <div>
                           <p className="text-xs font-bold text-gray-400 mb-1">현재 연봉</p>
                           <p className="text-xl font-black text-gray-700">{formatCurrency(actualCurrentSalary)}</p>
                         </div>
                         <div className="pt-6 border-t border-gray-200/50">
-                          <p className="text-xs font-bold text-gray-400 mb-2">현재 직급 / 등급</p>
+                          <p className="text-xs font-bold text-gray-400 mb-2">현재 직급 / 직전 등급</p>
                           <div className="flex flex-wrap gap-2">
                             <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-gray-600">{profile?.position}</span>
-                            <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-gray-600">{profile?.performance_rating || '-'} 등급</span>
+                            <span className="px-2.5 py-1 bg-white border border-gray-200 rounded-lg text-[11px] font-black text-gray-600">{lastYearRating} 등급</span>
                           </div>
                         </div>
                       </div>
@@ -297,34 +303,43 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                     {/* 2. 나의 요구안 */}
                     <div className="p-8 relative">
                       <p className="text-[10px] font-black text-[var(--color-primary)] uppercase tracking-widest mb-6">나의 요구안 상세</p>
-                      <div className="space-y-6">
-                        <div>
-                          <p className="text-xs font-bold text-gray-400 mb-1">희망 연봉</p>
-                          <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(hopeProposal)}</p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-[10px] font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md">
-                              +{formatCurrency(hopeProposal - actualCurrentSalary)} 인상
-                            </span>
-                            <span className="text-[10px] font-black text-[var(--color-secondary)] bg-[var(--color-secondary)]/10 px-2 py-0.5 rounded-md">
-                              {actualCurrentSalary > 0 ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` : '-%'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="pt-6 border-t border-gray-100">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
-                              <p className="text-sm font-black text-gray-900">{negotiation.performance_rating || '-'} 등급</p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
-                              <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
-                                {negotiation.promotion_request ? `${getNextPosition(profile?.position)} 승진 요청` : '미요청'}
-                              </p>
+                      {hopeProposal > 0 ? (
+                        <div className="space-y-6">
+                          <div>
+                            <p className="text-xs font-bold text-gray-400 mb-1">희망 연봉</p>
+                            <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrency(hopeProposal)}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md">
+                                +{formatCurrency(hopeProposal - actualCurrentSalary)} 인상
+                              </span>
+                              <span className="text-[10px] font-black text-[var(--color-secondary)] bg-[var(--color-secondary)]/10 px-2 py-0.5 rounded-md">
+                                {actualCurrentSalary > 0 ? `+${(((hopeProposal - actualCurrentSalary) / actualCurrentSalary) * 100).toFixed(1)}%` : '-%'}
+                              </span>
                             </div>
                           </div>
+                          <div className="pt-6 border-t border-gray-100">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase mb-1">희망 등급</p>
+                                <p className="text-sm font-black text-gray-900">{negotiation.performance_rating || '-'} 등급</p>
+                              </div>
+                              <div>
+                                <p className="text-[9px] font-black text-gray-400 uppercase mb-1">승진 요청</p>
+                                <p className={`text-sm font-black ${negotiation.promotion_request ? 'text-[var(--color-secondary)]' : 'text-gray-400'}`}>
+                                  {negotiation.promotion_request ? `${getNextPosition(profile?.position)} 승진 요청` : '미요청'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center py-4 text-gray-300">
+                          <div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+                            <FileText size={18} className="opacity-20" />
+                          </div>
+                          <p className="text-[11px] font-bold text-center leading-relaxed">아직 제출된 요구안이<br/>없습니다.</p>
+                        </div>
+                      )}
                     </div>
 
                     {/* 3. 평가자 제안 (오피셜) */}
