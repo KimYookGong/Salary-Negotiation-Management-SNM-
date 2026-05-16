@@ -65,6 +65,29 @@ const formatInputCurrency = (value) => {
 
 
 const EvaluateeDashboard = ({ profile, currentYear }) => {
+  const handleFinalAgreement = async () => {
+    if (!negotiation) return;
+    
+    if (!window.confirm('최종 합의를 진행하시겠습니까?\n합의 후에는 수정이 불가능하며 즉시 사원 정보에 반영됩니다.')) return;
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('negotiations')
+      .update({ 
+        status: 'final_agreement',
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', negotiation.id);
+
+    if (error) {
+      alert('합의 처리 중 오류가 발생했습니다: ' + error.message);
+    } else {
+      alert('최종 합의가 완료되었습니다. 사원 정보에 반영됩니다.');
+      fetchNegotiation();
+    }
+    setLoading(false);
+  };
+
   const positions = ['사원', '주임', '대리', '과장', '차장', '부장'];
   const getNextPosition = (current) => {
     const idx = positions.indexOf(current);
@@ -408,10 +431,10 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                 </div>
 
                 {/* 하단 액션 버튼 */}
-                {evalProposal > 0 && (
+                {evalProposal > 0 && negotiation.status !== 'final_agreement' && (
                   <div className="pt-4">
                     <button 
-                      onClick={() => alert('최종 합의 기능은 준비 중입니다.')}
+                      onClick={handleFinalAgreement}
                       className="w-full py-5 bg-gradient-to-r from-[var(--color-primary)] to-[#014421] text-white text-lg font-black rounded-3xl shadow-2xl shadow-primary/30 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-3 group"
                     >
                       <Check size={24} className="group-hover:scale-110 transition-transform" />
@@ -420,6 +443,15 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
                     <p className="text-center mt-4 text-[11px] font-bold text-gray-400">
                       최종 합의를 누르시면 이번 연도 연봉 협상이 확정되며 수정이 불가능합니다.
                     </p>
+                  </div>
+                )}
+
+                {negotiation.status === 'final_agreement' && (
+                  <div className="pt-4">
+                    <div className="w-full py-5 bg-gray-100 text-gray-500 text-lg font-black rounded-3xl flex items-center justify-center gap-3 cursor-not-allowed">
+                      <CheckCircle size={24} />
+                      최종 합의 완료됨 (확정)
+                    </div>
                   </div>
                 )}
               </div>
