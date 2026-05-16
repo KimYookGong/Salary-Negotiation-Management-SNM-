@@ -839,8 +839,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               {/* 통계 요약 등 추가 가능 공간 */}
               <div className="bg-gradient-to-br from-[var(--color-primary)] to-[#014421] p-8 rounded-[32px] shadow-lg shadow-primary/20 text-white relative overflow-hidden group">
                 <div className="relative z-10">
-                  <h3 className="text-xl font-black mb-2">협상 진행률</h3>
-                  <p className="text-white/60 text-xs font-medium mb-8">전체 대상자 중 협상 완료 인원</p>
+                  <h3 className="text-xl font-black mb-2 text-white">협상 진행률</h3>
+                  <p className="text-white/80 text-xs font-medium mb-8">전체 대상자 중 협상 완료 인원</p>
+
                   
                   <div className="flex items-baseline gap-2 mb-2">
                     <span className="text-5xl font-black tracking-tighter text-[var(--color-accent-1)]">
@@ -851,10 +852,11 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
                   
                   <div className="space-y-4 mt-8">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/40">
+                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/70">
                       <span>완료 인원</span>
                       <span>{negotiations.filter(n => n.status === 'final_agreement').length} / {employees.length}명</span>
                     </div>
+
                     <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                       <motion.div 
                         initial={{ width: 0 }}
