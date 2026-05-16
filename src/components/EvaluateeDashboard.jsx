@@ -111,7 +111,7 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
         setFormData(prev => ({ 
           ...prev,
           hopeSalary: '', 
-          rating: profile?.performance_rating || '', 
+          rating: (profile?.performance_rating && ['S','A','B','C','D'].includes(profile.performance_rating)) ? profile.performance_rating : 'B', 
           isPromoted: false, 
           jd: '', 
           achievement: '' 
@@ -140,20 +140,26 @@ const EvaluateeDashboard = ({ profile, currentYear }) => {
   const handleSubmit = async () => {
     if (!profile) return;
 
+    // 유효한 등급인지 확인 (ENUM 타입 안전성)
+    const validRatings = ['S', 'A', 'B', 'C', 'D'];
+    const finalRating = validRatings.includes(formData.rating) ? formData.rating : null;
+
     const payload = {
       evaluatee_id: profile.id,
       employee_id: profile.employee_id,
       evaluatee_name: profile.full_name,
       department: profile.department,
       position: profile.position,
-      performance_rating: formData.rating,
+      current_salary: profile.current_salary || 0, // 현재 연봉 정보 추가
+      performance_rating: finalRating,
       year: currentYear,
       jd: formData.jd,
       evaluatee_proposal: formData.hopeSalary,
       reason: formData.achievement,
       promotion_request: formData.isPromoted,
-      status: 'counter_offer',
-      updated_at: new Date()
+      // 관리자 제안이 이미 있는 경우 'counter_offer', 없는 경우 'submitted'
+      status: (negotiation && negotiation.evaluator_proposal) ? 'counter_offer' : 'submitted',
+      updated_at: new Date().toISOString()
     };
 
     // employee_id가 없거나 빈 문자열이면 payload에서 제거하여 외래키 제약 오류 방지
