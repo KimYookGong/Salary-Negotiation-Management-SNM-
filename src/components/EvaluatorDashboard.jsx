@@ -572,12 +572,6 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       }
 
       // 5. 이탈 고위험군 조회 (최신순)
-      const fallbackRisks = [
-        { id: 'risk-1', employee_name: '홍길동', department: '개발팀', reason: '최근 연봉 협상 지연 및 주요 경쟁사 헤드헌팅 제안 수신 감지', risk_level: 'High' },
-        { id: 'risk-2', employee_name: '김철수', department: '마케팅팀', reason: '핵심 성과 기여자이나 업계 평균 대비 연봉 수준 하위 10%', risk_level: 'High' },
-        { id: 'risk-3', employee_name: '이영희', department: '디자인팀', reason: '동료 다수 퇴사로 인한 업무 과중 및 직무 만족도 급감', risk_level: 'High' }
-      ];
-
       try {
         const { data: risks, error: risksError } = await supabase
           .from('risk_assessments')
@@ -585,14 +579,14 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
           .eq('risk_level', 'High')
           .order('created_at', { ascending: false });
 
-        if (!risksError && risks && risks.length > 0) {
+        if (!risksError && risks) {
           setRiskAssessments(risks);
         } else {
-          setRiskAssessments(fallbackRisks);
+          setRiskAssessments([]);
         }
       } catch (err) {
-        console.warn('risk_assessments fetch error, using fallback:', err);
-        setRiskAssessments(fallbackRisks);
+        console.warn('risk_assessments fetch error:', err);
+        setRiskAssessments([]);
       }
 
       // 6. 시장 벤치마크 데이터 조회
