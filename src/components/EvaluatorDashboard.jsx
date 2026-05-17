@@ -464,6 +464,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [riskAssessments, setRiskAssessments] = useState([]); // 이탈 고위험군 데이터
   const [marketBenchmarks, setMarketBenchmarks] = useState([]); // 시장 벤치마크 데이터
   const [chartViewMode, setChartViewMode] = useState('budget'); // 차트 뷰 모드 ('budget' 또는 'proposal')
+  const [hoveredDot, setHoveredDot] = useState(null); // 성과-보상 차트 호버된 점 정보
 
   
   const [dbSearchTerm, setDbSearchTerm] = useState('');
@@ -793,6 +794,46 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     return negotiations.filter(n => n.status === 'submitted');
   }, [negotiations]);
 
+  // [개편 위젯 B용] 성과-보상 사분면 차트 데이터 가공
+  const scatterData = React.useMemo(() => {
+    return negotiations.map(neg => {
+      const propStr = neg.evaluatee_proposal || '';
+      const cleanProp = propStr.replace(/[^0-9.-]/g, '');
+      const proposalVal = parseFloat(cleanProp) || 0;
+      const currentVal = Number(neg.current_salary || 0);
+      
+      const rate = currentVal > 0 ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
+      
+      const ratingMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+      const score = ratingMap[neg.performance_rating] || 3;
+      
+      return {
+        ...neg,
+        x: score,
+        y: rate,
+        proposalVal,
+        currentVal,
+        rateFormatted: rate.toFixed(1)
+      };
+    });
+  }, [negotiations]);
+
+  // 성과-보상 차트용 평균 요구 인상률
+  const avgScatterRate = React.useMemo(() => {
+    if (scatterData.length === 0) return 5.0; // 협상안이 없을 경우 기본 5%선 표시
+    const total = scatterData.reduce((sum, item) => sum + item.y, 0);
+    const avg = total / scatterData.length;
+    return Math.max(0, avg); // 음수 방지
+  }, [scatterData]);
+
+  // 성과-보상 차트용 Y축 최댓값 (최소 15% 한도선 적용)
+  const maxScatterY = React.useMemo(() => {
+    if (scatterData.length === 0) return 20;
+    const rates = scatterData.map(item => item.y);
+    const maxVal = Math.max(...rates, 15);
+    return Math.ceil(maxVal / 5) * 5; // 5% 단위로 반올림
+  }, [scatterData]);
+
   // [개편 위젯 C용] 부서별 예산 현황 차트 데이터 가공
   const processedChartData = React.useMemo(() => {
     const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
@@ -1014,60 +1055,208 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                   </div>
                 </div>
 
-                {/* [위젯 B] 룰 기반 이탈 고위험군 */}
-                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-red-100 transition-all duration-300">
+                {/* [위젯 B] 성과-보상 사분면 차트 */}
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-[var(--color-primary)]/20 transition-all duration-300 relative">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-red-50 rounded-2xl text-red-500 relative flex items-center justify-center">
-                        <ShieldAlert size={18} />
-                        {riskAssessments.length > 0 && (
-                          <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                        )}
+                      <div className="p-2.5 bg-emerald-50 rounded-2xl text-[var(--color-primary)] relative flex items-center justify-center">
+                        <TrendingUp size={18} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-black text-gray-900">⚠️ 이탈 고위험 알림</h3>
-                          {riskAssessments.length > 0 && (
-                            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
-                              {riskAssessments.length}
-                            </span>
-                          )}
+                          <h3 className="text-base font-black text-gray-900">📊 성과-보상 사분면 차트</h3>
                         </div>
-                        <p className="text-[10px] text-gray-400 font-medium">인적 자원 유실 위험 경보 목록</p>
+                        <p className="text-[10px] text-gray-400 font-medium">X축: 성과 등급 (D~S) | Y축: 요구 인상률 (%)</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
-                    {riskAssessments.length > 0 ? (
-                      riskAssessments.map((risk) => (
-                        <div 
-                          key={risk.id || risk.employee_name} 
-                          className="group/item flex items-center justify-between p-3.5 bg-red-50/10 rounded-2xl border border-red-50/30 hover:border-red-200 hover:bg-red-50/20 transition-all duration-300"
-                        >
-                          <div className="flex-1 min-w-0 mr-3">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-black text-gray-900">{risk.employee_name}</span>
-                              <span className="text-[9px] font-bold text-red-600 bg-red-100/50 px-2 py-0.5 rounded">
-                                {risk.department}
-                              </span>
-                            </div>
-                            <p 
-                              className="text-xs text-gray-500 mt-1 font-medium truncate" 
-                              title={risk.reason}
-                            >
-                              {risk.reason}
-                            </p>
+                  <div className="flex-1 relative min-h-0 w-full">
+                    {scatterData.length > 0 ? (
+                      (() => {
+                        const margin = { top: 20, right: 20, bottom: 35, left: 45 };
+                        const width = 400;
+                        const height = 240;
+                        const innerWidth = width - margin.left - margin.right;
+                        const innerHeight = height - margin.top - margin.bottom;
+
+                        const getXPixel = (x) => margin.left + ((x - 0.5) / 5) * innerWidth;
+                        const getYPixel = (y) => height - margin.bottom - (y / maxScatterY) * innerHeight;
+
+                        const xSplit = getXPixel(3);
+                        const ySplit = getYPixel(avgScatterRate);
+
+                        const yTicks = [];
+                        for (let i = 0; i <= maxScatterY; i += 5) {
+                          yTicks.push(i);
+                        }
+
+                        const xTicks = [
+                          { score: 1, label: 'D' },
+                          { score: 2, label: 'C' },
+                          { score: 3, label: 'B' },
+                          { score: 4, label: 'A' },
+                          { score: 5, label: 'S' }
+                        ];
+
+                        return (
+                          <div className="w-full h-full relative">
+                            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full select-none">
+                              {/* 1. 4분면 배경 투명 색상 채우기 */}
+                              {/* Top-Left (2분면 - 조정 필요): Red */}
+                              <rect 
+                                x={margin.left} 
+                                y={margin.top} 
+                                width={xSplit - margin.left} 
+                                height={ySplit - margin.top} 
+                                fill="#EF4444" 
+                                fillOpacity="0.02" 
+                              />
+                              {/* Top-Right (1분면 - 핵심 인재): Emerald */}
+                              <rect 
+                                x={xSplit} 
+                                y={margin.top} 
+                                width={width - margin.right - xSplit} 
+                                height={ySplit - margin.top} 
+                                fill="#10B981" 
+                                fillOpacity="0.02" 
+                              />
+                              {/* Bottom-Left (3분면 - 적정 수준): Gray */}
+                              <rect 
+                                x={margin.left} 
+                                y={ySplit} 
+                                width={xSplit - margin.left} 
+                                height={height - margin.bottom - ySplit} 
+                                fill="#6B7280" 
+                                fillOpacity="0.01" 
+                              />
+                              {/* Bottom-Right (4분면 - 이탈 관리): Blue */}
+                              <rect 
+                                x={xSplit} 
+                                y={ySplit} 
+                                width={width - margin.right - xSplit} 
+                                height={height - margin.bottom - ySplit} 
+                                fill="#3B82F6" 
+                                fillOpacity="0.02" 
+                              />
+
+                              {/* 2. 4분면 텍스트 가이드 라벨 */}
+                              <text x={margin.left + 8} y={margin.top + 13} fontSize="8" fontWeight="bold" fill="#EF4444" fillOpacity="0.4" textAnchor="start">조정 필요</text>
+                              <text x={width - margin.right - 8} y={margin.top + 13} fontSize="8" fontWeight="bold" fill="#10B981" fillOpacity="0.4" textAnchor="end">핵심 인재</text>
+                              <text x={margin.left + 8} y={height - margin.bottom - 8} fontSize="8" fontWeight="bold" fill="#6B7280" fillOpacity="0.4" textAnchor="start">적정 수준</text>
+                              <text x={width - margin.right - 8} y={height - margin.bottom - 8} fontSize="8" fontWeight="bold" fill="#3B82F6" fillOpacity="0.4" textAnchor="end">이탈 관리</text>
+
+                              {/* 3. Y축 그리드 라인 & 레이블 */}
+                              {yTicks.map(tick => {
+                                const yPixel = getYPixel(tick);
+                                return (
+                                  <g key={tick}>
+                                    <line x1={margin.left} y1={yPixel} x2={width - margin.right} y2={yPixel} stroke="#F1F5F9" strokeWidth="1" />
+                                    <text x={margin.left - 8} y={yPixel + 3} textAnchor="end" fontSize="8" fill="#94A3B8">{tick}%</text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* 4. X축 등급 라벨 */}
+                              {xTicks.map(tick => {
+                                const xPixel = getXPixel(tick.score);
+                                return (
+                                  <g key={tick.score}>
+                                    <line x1={xPixel} y1={margin.top} x2={xPixel} y2={height - margin.bottom} stroke="#F8FAFC" strokeWidth="1" />
+                                    <text x={xPixel} y={height - margin.bottom + 14} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748B">{tick.label}</text>
+                                  </g>
+                                );
+                              })}
+
+                              {/* 5. 십자 중앙 보조선 */}
+                              {/* 세로선 (X = B등급) */}
+                              <line x1={xSplit} y1={margin.top} x2={xSplit} y2={height - margin.bottom} stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 3" />
+                              {/* 가로선 (Y = 평균 인상 요구율) */}
+                              <line x1={margin.left} y1={ySplit} x2={width - margin.right} y2={ySplit} stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 3" />
+                              
+                              {/* 평균 인상률 텍스트 표시 */}
+                              <text x={width - margin.right - 5} y={ySplit - 4} fontSize="7" fontWeight="bold" fill="#94A3B8" textAnchor="end">평균 요구율 ({avgScatterRate.toFixed(1)}%)</text>
+
+                              {/* 6. 사원 개별 데이터 점 */}
+                              {scatterData.map((d, index) => {
+                                const xPixel = getXPixel(d.x);
+                                const yPixel = getYPixel(d.y);
+                                const isHovered = hoveredDot?.id === d.id;
+
+                                // 사분면별 동적 점 색상 배정
+                                let dotColor = "var(--color-primary)";
+                                if (d.x >= 3 && d.y >= avgScatterRate) {
+                                  dotColor = "#10B981"; // Emerald
+                                } else if (d.x < 3 && d.y >= avgScatterRate) {
+                                  dotColor = "#EF4444"; // Red
+                                } else if (d.x >= 3 && d.y < avgScatterRate) {
+                                  dotColor = "#3B82F6"; // Blue
+                                } else {
+                                  dotColor = "#6B7280"; // Gray
+                                }
+
+                                return (
+                                  <circle
+                                    key={d.id || index}
+                                    cx={xPixel}
+                                    cy={yPixel}
+                                    r={isHovered ? 8 : 5}
+                                    fill={dotColor}
+                                    stroke="white"
+                                    strokeWidth={isHovered ? 2.5 : 1}
+                                    className="cursor-pointer transition-all duration-200"
+                                    opacity="0.85"
+                                    onMouseEnter={() => setHoveredDot({ ...d, xPixel, yPixel })}
+                                    onMouseLeave={() => setHoveredDot(null)}
+                                    onClick={() => setSelectedNegotiation(d)}
+                                  />
+                                );
+                              })}
+
+                              {/* 7. 반응형 경계 감지 스마트 SVG 툴팁 */}
+                              {hoveredDot && (() => {
+                                const isTooltipAbove = hoveredDot.yPixel >= 75;
+                                const tooltipY = isTooltipAbove ? hoveredDot.yPixel - 15 : hoveredDot.yPixel + 15;
+                                const tooltipRectY = isTooltipAbove ? -68 : 8;
+                                const pointerPoints = isTooltipAbove 
+                                  ? "0,0 -5,-5 5,-5" 
+                                  : "0,0 -5,5 5,5";
+
+                                return (
+                                  <g transform={`translate(${hoveredDot.xPixel}, ${tooltipY})`} className="pointer-events-none z-50">
+                                    {/* 툴팁 어두운 배경 */}
+                                    <rect 
+                                      x="-75" 
+                                      y={tooltipRectY} 
+                                      width="150" 
+                                      height="60" 
+                                      rx="8" 
+                                      fill="#1E293B" 
+                                      opacity="0.95" 
+                                    />
+                                    {/* 툴팁 텍스트 정보 */}
+                                    <text x="0" y={tooltipRectY + 18} fill="white" fontSize="9" fontWeight="bold" textAnchor="middle">
+                                      {hoveredDot.evaluatee_name} ({hoveredDot.performance_rating}등급)
+                                    </text>
+                                    <text x="0" y={tooltipRectY + 34} fill="#94A3B8" fontSize="8" textAnchor="middle">
+                                      현재: {formatChartYLabel(hoveredDot.currentVal)}원
+                                    </text>
+                                    <text x="0" y={tooltipRectY + 48} fill="#A4D65E" fontSize="8" fontWeight="bold" textAnchor="middle">
+                                      요구 인상률: {hoveredDot.rateFormatted}%
+                                    </text>
+                                    {/* 말풍선 삼각형 꼬리 */}
+                                    <polygon points={pointerPoints} fill="#1E293B" opacity="0.95" />
+                                  </g>
+                                );
+                              })()}
+                            </svg>
                           </div>
-                          <div className="flex items-center text-red-400 group-hover/item:text-red-500 transition-colors shrink-0">
-                            <ShieldAlert size={16} />
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })()
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center py-8">
-                        <p className="text-sm font-bold">이탈 고위험 대상자가 없습니다.</p>
-                        <p className="text-[10px] text-gray-300 mt-1">안정적으로 인력이 관리되고 있습니다.</p>
+                        <p className="text-sm font-bold">표시할 성과-보상 데이터가 없습니다.</p>
+                        <p className="text-[10px] text-gray-300 mt-1">협상 제안 데이터가 입력되면 표시됩니다.</p>
                       </div>
                     )}
                   </div>
