@@ -311,3 +311,33 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_on_final_agreement
 AFTER INSERT OR UPDATE OR DELETE ON negotiations
 FOR EACH ROW EXECUTE FUNCTION sync_final_agreement_to_master();
+
+-- 10. 이탈 고위험군 (risk_assessments) 테이블 생성
+CREATE TABLE IF NOT EXISTS risk_assessments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_name TEXT NOT NULL,
+  department TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  risk_level TEXT NOT NULL CHECK (risk_level IN ('High', 'Medium', 'Low')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 11. 시장 벤치마크 (market_benchmarks) 테이블 생성
+CREATE TABLE IF NOT EXISTS market_benchmarks (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  department TEXT NOT NULL,
+  position position_type NOT NULL, -- 기존 정의된 position_type ENUM 재사용
+  min_salary BIGINT NOT NULL,
+  avg_salary BIGINT NOT NULL,
+  max_salary BIGINT NOT NULL,
+  year INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT unique_dept_pos_year UNIQUE (department, position, year)
+);
+
+-- RLS 활성화 및 정책 부여
+ALTER TABLE risk_assessments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE market_benchmarks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access for risk_assessments" ON risk_assessments FOR ALL USING (true);
+CREATE POLICY "Allow all access for market_benchmarks" ON market_benchmarks FOR ALL USING (true);
