@@ -232,20 +232,29 @@ CREATE OR REPLACE FUNCTION sync_final_agreement_to_master()
 RETURNS TRIGGER AS $$
 DECLARE
     target_emp_id TEXT;
+    target_position position_type;
     prev_history RECORD;
 BEGIN
     -- 1. 최종 합의 상태로의 변경 (INSERT 또는 UPDATE)
     IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') THEN
         IF NEW.status = 'final_agreement' AND (TG_OP = 'INSERT' OR OLD.status <> 'final_agreement') THEN
-            SELECT employee_id INTO target_emp_id FROM profiles WHERE id = NEW.evaluatee_id;
+            -- 사번 확보 (협상 데이터 최우선 -> 프로필 참조)
+            target_emp_id := COALESCE(NEW.employee_id, (SELECT employee_id FROM profiles WHERE id = NEW.evaluatee_id));
+            
+            -- 직급 확보 (협상 데이터 -> 프로필 -> 기본값 '사원')
+            target_position := COALESCE(
+                NEW.position, 
+                (SELECT position FROM profiles WHERE id = NEW.evaluatee_id),
+                '사원'::position_type
+            );
             
             IF target_emp_id IS NOT NULL THEN
-                -- 직급(position) 정보가 없는 경우 프로필에서 가져옴 (NOT NULL 제약 조건 대응)
+                -- [중요] employee_history에 새로운 연도 데이터 생성 또는 갱신
                 INSERT INTO employee_history (employee_id, year, position, salary, performance_rating)
                 VALUES (
                     target_emp_id, 
                     NEW.year, 
-                    COALESCE(NEW.position, (SELECT position FROM profiles WHERE id = NEW.evaluatee_id)), 
+                    target_position, 
                     COALESCE(NEW.evaluator_proposal::BIGINT, 0), 
                     NEW.performance_rating
                 )
@@ -254,12 +263,13 @@ BEGIN
                     performance_rating = EXCLUDED.performance_rating, 
                     position = EXCLUDED.position;
 
+                -- profiles 테이블(현재 상태)도 함께 갱신
                 UPDATE profiles SET 
                     current_salary = COALESCE(NEW.evaluator_proposal::BIGINT, current_salary), 
                     performance_rating = COALESCE(NEW.performance_rating, performance_rating), 
-                    position = COALESCE(NEW.position, position), 
+                    position = target_position, 
                     updated_at = NOW()
-                WHERE id = NEW.evaluatee_id;
+                WHERE id = NEW.evaluatee_id OR employee_id = target_emp_id;
             END IF;
         END IF;
     END IF;
@@ -267,14 +277,11 @@ BEGIN
     -- 2. 제안 취소 또는 삭제 (DELETE 또는 상태가 final_agreement에서 다른 것으로 변경)
     IF (TG_OP = 'DELETE') OR (TG_OP = 'UPDATE' AND OLD.status = 'final_agreement' AND NEW.status <> 'final_agreement') THEN
         IF (TG_OP = 'DELETE' AND OLD.status = 'final_agreement') OR (TG_OP = 'UPDATE') THEN
-            -- 사번 정보 가져오기 (협상 데이터 자체 정보 우선, 없으면 프로필 참조)
             target_emp_id := COALESCE(OLD.employee_id, (SELECT employee_id FROM profiles WHERE id = OLD.evaluatee_id));
             
             IF target_emp_id IS NOT NULL THEN
-                -- 1. 해당 연도의 히스토리 삭제
                 DELETE FROM employee_history WHERE employee_id = target_emp_id AND year = OLD.year;
 
-                -- 2. 전년도 데이터 조회하여 프로필 복구
                 SELECT * INTO prev_history FROM employee_history 
                 WHERE employee_id = target_emp_id AND year < OLD.year 
                 ORDER BY year DESC LIMIT 1;
@@ -285,14 +292,13 @@ BEGIN
                         performance_rating = prev_history.performance_rating, 
                         position = prev_history.position, 
                         updated_at = NOW()
-                    WHERE id = OLD.evaluatee_id;
+                    WHERE id = OLD.evaluatee_id OR employee_id = target_emp_id;
                 ELSE
-                    -- 전년도 데이터도 없는 경우 초기화
                     UPDATE profiles SET 
                         current_salary = 0, 
                         performance_rating = '-', 
                         updated_at = NOW()
-                    WHERE id = OLD.evaluatee_id;
+                    WHERE id = OLD.evaluatee_id OR employee_id = target_emp_id;
                 END IF;
             END IF;
         END IF;

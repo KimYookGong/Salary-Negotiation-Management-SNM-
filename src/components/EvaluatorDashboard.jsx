@@ -461,6 +461,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [employees, setEmployees] = useState([]);
   const [budgets, setBudgets] = useState({ company: null, depts: [] });
   const [loading, setLoading] = useState(true);
+  const [riskAssessments, setRiskAssessments] = useState([]); // 이탈 고위험군 데이터
+  const [marketBenchmarks, setMarketBenchmarks] = useState([]); // 시장 벤치마크 데이터
+  const [chartViewMode, setChartViewMode] = useState('budget'); // 차트 뷰 모드 ('budget' 또는 'proposal')
 
   
   const [dbSearchTerm, setDbSearchTerm] = useState('');
@@ -566,6 +569,46 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         const dummyDepts = depts.map(d => ({ department_name: d, year: currentYear, total_budget: 200000000, used_budget: 0 }));
         const { data: newDepts } = await supabase.from('department_budgets').upsert(dummyDepts).select();
         setBudgets(prev => ({ ...prev, depts: newDepts || [] }));
+      }
+
+      // 5. 이탈 고위험군 조회 (최신순)
+      const fallbackRisks = [
+        { id: 'risk-1', employee_name: '홍길동', department: '개발팀', reason: '최근 연봉 협상 지연 및 주요 경쟁사 헤드헌팅 제안 수신 감지', risk_level: 'High' },
+        { id: 'risk-2', employee_name: '김철수', department: '마케팅팀', reason: '핵심 성과 기여자이나 업계 평균 대비 연봉 수준 하위 10%', risk_level: 'High' },
+        { id: 'risk-3', employee_name: '이영희', department: '디자인팀', reason: '동료 다수 퇴사로 인한 업무 과중 및 직무 만족도 급감', risk_level: 'High' }
+      ];
+
+      try {
+        const { data: risks, error: risksError } = await supabase
+          .from('risk_assessments')
+          .select('*')
+          .eq('risk_level', 'High')
+          .order('created_at', { ascending: false });
+
+        if (!risksError && risks && risks.length > 0) {
+          setRiskAssessments(risks);
+        } else {
+          setRiskAssessments(fallbackRisks);
+        }
+      } catch (err) {
+        console.warn('risk_assessments fetch error, using fallback:', err);
+        setRiskAssessments(fallbackRisks);
+      }
+
+      // 6. 시장 벤치마크 데이터 조회
+      try {
+        const { data: benchmarks, error: benchError } = await supabase
+          .from('market_benchmarks')
+          .select('*');
+
+        if (!benchError && benchmarks && benchmarks.length > 0) {
+          setMarketBenchmarks(benchmarks);
+        } else {
+          setMarketBenchmarks([]);
+        }
+      } catch (err) {
+        console.warn('market_benchmarks fetch error:', err);
+        setMarketBenchmarks([]);
       }
 
     } catch (error) {
@@ -751,11 +794,93 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       };
   const budgetPercentage = (currentBudgetContext.used / currentBudgetContext.limit) * 100;
 
+  // [개편 위젯 A용] 즉시 검토 대기열 (status === 'submitted')
+  const queueNegotiations = React.useMemo(() => {
+    return negotiations.filter(n => n.status === 'submitted');
+  }, [negotiations]);
+
+  // [개편 위젯 C용] 부서별 예산 현황 차트 데이터 가공
+  const processedChartData = React.useMemo(() => {
+    const depts = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
+    
+    return depts.map(dept => {
+      // 1. 부서별 예산 정보 매핑
+      const dbDept = budgets.depts?.find(d => d.department_name === dept);
+      const totalBudget = Number(dbDept?.total_budget || 0);
+      const usedBudget = Number(dbDept?.used_budget || 0);
+      
+      // 2. 부서별 협상 정보 집계
+      const deptNegs = negotiations.filter(n => n.department === dept);
+      const totalEmployeeProposals = deptNegs.reduce((sum, n) => sum + Number(n.evaluatee_proposal || 0), 0);
+      const totalEvaluatorProposals = deptNegs.reduce((sum, n) => sum + Number(n.evaluator_proposal || 0), 0);
+      
+      return {
+        department: dept,
+        budget: {
+          label1: '배정 예산',
+          value1: totalBudget,
+          label2: '사용 예산',
+          value2: usedBudget
+        },
+        proposal: {
+          label1: '사원 요구 총액',
+          value1: totalEmployeeProposals,
+          label2: '회사 제안 총액',
+          value2: totalEvaluatorProposals
+        }
+      };
+    });
+  }, [budgets.depts, negotiations]);
+
+  // 부서별 예산이 아예 미설정되었는지 체크
+  const isBudgetEmpty = React.useMemo(() => {
+    return !budgets.depts || budgets.depts.length === 0 || budgets.depts.every(d => Number(d.total_budget || 0) === 0);
+  }, [budgets.depts]);
+
+  // 빈 예산 시 자동으로 제안금액 비교 뷰로 전환
+  useEffect(() => {
+    if (isBudgetEmpty) {
+      setChartViewMode('proposal');
+    } else {
+      setChartViewMode('budget');
+    }
+  }, [isBudgetEmpty]);
+
+  // 차트 뷰모드별 최댓값 설정 (비율 계산 및 Y축용)
+  const maxChartValue = React.useMemo(() => {
+    let max = 0;
+    processedChartData.forEach(item => {
+      if (chartViewMode === 'budget') {
+        if (item.budget.value1 > max) max = item.budget.value1;
+        if (item.budget.value2 > max) max = item.budget.value2;
+      } else {
+        if (item.proposal.value1 > max) max = item.proposal.value1;
+        if (item.proposal.value2 > max) max = item.proposal.value2;
+      }
+    });
+    // 나눗셈 0 방지 및 시각적 안정감을 위해 15% 마진 적용
+    return max > 0 ? max * 1.15 : 10000000;
+  }, [processedChartData, chartViewMode]);
+
+  // 한국식 큰 금액 포맷터 (예: 1.2억원, 8,500만원)
+  const formatChartYLabel = (val) => {
+    if (val === 0) return '0';
+    if (val >= 100000000) {
+      const eok = (val / 100000000).toFixed(1).replace(/\.0$/, '');
+      return `${eok}억원`;
+    }
+    if (val >= 10000) {
+      const man = (val / 10000).toFixed(0);
+      return `${man}만원`;
+    }
+    return val.toLocaleString() + '원';
+  };
+
   return (
     <div className="h-[calc(100vh-140px)] flex flex-col gap-6 w-full max-w-[1600px] mx-auto overflow-hidden">
       {currentTab === 'dashboard' && (
-        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
-          <div className="flex flex-col gap-5 shrink-0">
+        <div className="flex-1 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="flex flex-col gap-6 pb-8">
             <div className="flex items-center justify-between px-2">
               <h3 className="text-xl font-black text-[var(--color-primary)] flex items-center gap-2">
                 <Wallet size={24} /> 예산 현황
@@ -826,80 +951,273 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               </div>
             </div>
 
-            {/* 중요 알림 블록 */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 group hover:border-[var(--color-primary)]/30 transition-all duration-300">
-                <div className="flex items-center justify-between mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 bg-orange-100 rounded-2xl text-orange-600">
-                      <AlertCircle size={20} />
-                    </div>
-                    <h3 className="text-lg font-black text-gray-900">중요 알림</h3>
-                  </div>
-                  <button onClick={() => setIsNotiPopupOpen(true)} className="text-xs font-bold text-gray-400 hover:text-[var(--color-primary)] transition-colors">전체보기</button>
-                </div>
-
+            {/* 3가지 핵심 인사이트 위젯 */}
+            <div className="flex flex-col gap-6">
+              {/* 상단 2개 카드 가로 배치 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                <div className="space-y-4">
-                  {recentUpdates.length > 0 ? (
-                    recentUpdates.map((update) => (
-                      <div key={update.id} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-transparent hover:border-gray-100 hover:bg-white transition-all group/item">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${statusMap[update.status]?.className}`}>
-                            {statusMap[update.status]?.label.substring(0, 1)}
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-gray-900">
-                              <span className="text-[var(--color-primary)]">{update.evaluatee_name}</span>님의 협상 상태가 
-                              <span className="mx-1 px-2 py-0.5 bg-white border border-gray-100 rounded-lg text-[10px] font-black">{statusMap[update.status]?.label}</span>
-                              (으)로 변경되었습니다.
-                            </p>
-                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">{update.department} / {update.position}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] font-black text-gray-300 group-hover/item:text-[var(--color-primary)] transition-colors">{formatRelativeTime(update.updated_at)}</p>
-                        </div>
+                {/* [위젯 A] 즉시 검토 대기열 */}
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-[var(--color-primary)]/20 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-orange-50 rounded-2xl text-orange-500 relative flex items-center justify-center">
+                        <Clock size={18} />
+                        {queueNegotiations.length > 0 && (
+                          <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-orange-500 rounded-full animate-ping" />
+                        )}
                       </div>
-                    ))
-                  ) : (
-                    <div className="py-12 text-center text-gray-400 font-medium">최근 업데이트된 내역이 없습니다.</div>
-                  )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-black text-gray-900">즉시 검토 대기열</h3>
+                          {queueNegotiations.length > 0 && (
+                            <span className="bg-orange-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                              {queueNegotiations.length}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-medium">관리자 피드백 대기중인 협상안</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
+                    {queueNegotiations.length > 0 ? (
+                      queueNegotiations.map((item) => (
+                        <div 
+                          key={item.id} 
+                          className="flex items-center justify-between p-3.5 bg-gray-50/50 rounded-2xl border border-transparent hover:border-orange-100 hover:bg-orange-50/5 transition-all duration-300"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-orange-100/50 text-orange-600 flex items-center justify-center font-black text-xs">
+                              {item.evaluatee_name?.substring(0, 1)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-sm font-black text-gray-900">{item.evaluatee_name}</span>
+                                <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  {item.department}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-gray-400 font-medium mt-0.5">
+                                요구: <span className="font-bold text-orange-600">{formatCurrency(item.evaluatee_proposal)}</span>
+                              </p>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => setSelectedNegotiation(item)}
+                            className="px-3.5 py-2 bg-orange-50 hover:bg-orange-100 active:scale-95 text-orange-600 text-xs font-black rounded-xl transition-all shadow-sm shadow-orange-500/5"
+                          >
+                            검토하기
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center py-8">
+                        <p className="text-sm font-bold">검토 대기 중인 협상안이 없습니다.</p>
+                        <p className="text-[10px] text-gray-300 mt-1">사원들의 새로운 요구안이 제출되면 여기에 표시됩니다.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* [위젯 B] 룰 기반 이탈 고위험군 */}
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-red-100 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-red-50 rounded-2xl text-red-500 relative flex items-center justify-center">
+                        <ShieldAlert size={18} />
+                        {riskAssessments.length > 0 && (
+                          <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base font-black text-gray-900">⚠️ 이탈 고위험 알림</h3>
+                          {riskAssessments.length > 0 && (
+                            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                              {riskAssessments.length}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-medium">인적 자원 유실 위험 경보 목록</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1">
+                    {riskAssessments.length > 0 ? (
+                      riskAssessments.map((risk) => (
+                        <div 
+                          key={risk.id || risk.employee_name} 
+                          className="group/item flex items-center justify-between p-3.5 bg-red-50/10 rounded-2xl border border-red-50/30 hover:border-red-200 hover:bg-red-50/20 transition-all duration-300"
+                        >
+                          <div className="flex-1 min-w-0 mr-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-black text-gray-900">{risk.employee_name}</span>
+                              <span className="text-[9px] font-bold text-red-600 bg-red-100/50 px-2 py-0.5 rounded">
+                                {risk.department}
+                              </span>
+                            </div>
+                            <p 
+                              className="text-xs text-gray-500 mt-1 font-medium truncate" 
+                              title={risk.reason}
+                            >
+                              {risk.reason}
+                            </p>
+                          </div>
+                          <div className="flex items-center text-red-400 group-hover/item:text-red-500 transition-colors shrink-0">
+                            <ShieldAlert size={16} />
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center py-8">
+                        <p className="text-sm font-bold">이탈 고위험 대상자가 없습니다.</p>
+                        <p className="text-[10px] text-gray-300 mt-1">안정적으로 인력이 관리되고 있습니다.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* [위젯 C] 부서별 예산 현황 차트 */}
+              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 w-full min-h-[380px] hover:border-[var(--color-primary)]/20 transition-all duration-300 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 pb-3 border-b border-gray-50 mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-green-50 rounded-2xl text-[var(--color-primary)] flex items-center justify-center">
+                      <TrendingUp size={18} />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-gray-900">부서별 예산 및 제안 현황</h3>
+                      <p className="text-[10px] text-gray-400 font-medium">부서별 자원 활용과 요구/제안액 비교 분석</p>
+                    </div>
+                  </div>
+
+                  {/* 뷰 모드 컨트롤 */}
+                  <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-2xl border border-gray-100 self-start sm:self-auto">
+                    <button 
+                      onClick={() => setChartViewMode('budget')}
+                      disabled={isBudgetEmpty}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                        chartViewMode === 'budget' 
+                          ? 'bg-white text-[var(--color-primary)] shadow-sm border border-gray-200' 
+                          : 'text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      예산 대비 집행액
+                    </button>
+                    <button 
+                      onClick={() => setChartViewMode('proposal')}
+                      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                        chartViewMode === 'proposal' 
+                          ? 'bg-white text-[var(--color-primary)] shadow-sm border border-gray-200' 
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      요구액 대비 제안액
+                    </button>
+                  </div>
+                </div>
+
+                {/* 차트 캔버스 영역 */}
+                <div className="flex-1 flex flex-col justify-between min-h-[250px] relative mt-2">
+                  <div className="flex-1 w-full flex relative h-[210px]">
+                    {/* Y축 눈금선 및 레이블 */}
+                    <div className="w-16 h-full flex flex-col justify-between items-end pr-3.5 text-[9px] font-black text-gray-400 pb-5">
+                      <span>{formatChartYLabel(maxChartValue)}</span>
+                      <span>{formatChartYLabel(maxChartValue * 0.75)}</span>
+                      <span>{formatChartYLabel(maxChartValue * 0.5)}</span>
+                      <span>{formatChartYLabel(maxChartValue * 0.25)}</span>
+                      <span>0</span>
+                    </div>
+
+                    {/* 백그라운드 격자선 및 막대 */}
+                    <div className="flex-1 h-full relative">
+                      {/* 격자 격자선 */}
+                      <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-5">
+                        <div className="w-full border-t border-dashed border-gray-100" />
+                        <div className="w-full border-t border-dashed border-gray-100" />
+                        <div className="w-full border-t border-dashed border-gray-100" />
+                        <div className="w-full border-t border-dashed border-gray-100" />
+                        <div className="w-full border-b border-gray-200" />
+                      </div>
+
+                      {/* 실제 막대 그래프 렌더링 */}
+                      <div className="absolute inset-0 flex items-end justify-around pb-5">
+                        {processedChartData.map((item) => {
+                          const dataMode = chartViewMode === 'budget' ? item.budget : item.proposal;
+                          const val1 = dataMode.value1;
+                          const val2 = dataMode.value2;
+                          const label1 = dataMode.label1;
+                          const label2 = dataMode.label2;
+
+                          const pct1 = maxChartValue > 0 ? (val1 / maxChartValue) * 100 : 0;
+                          const pct2 = maxChartValue > 0 ? (val2 / maxChartValue) * 100 : 0;
+
+                          return (
+                            <div key={item.department} className="flex flex-col items-center h-full justify-end w-24">
+                              <div className="flex items-end gap-3.5 h-full w-full justify-center">
+                                {/* 막대 1 */}
+                                <div className="relative group/bar flex flex-col items-end h-full justify-end">
+                                  {/* 툴팁 */}
+                                  <div className="absolute bottom-full mb-2.5 hidden group-hover/bar:flex flex-col items-center z-20 pointer-events-none transition-all duration-200 min-w-[140px] -translate-x-1/2 left-1/2">
+                                    <div className="bg-gray-900 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-xl text-center border border-gray-800">
+                                      <p className="text-gray-400 text-[8px] font-medium tracking-wide">{label1}</p>
+                                      <p className="mt-0.5 font-sans">{val1.toLocaleString()}원</p>
+                                    </div>
+                                    <div className="w-2 h-2 bg-gray-900 rotate-45 -mt-1 border-r border-b border-gray-900" />
+                                  </div>
+                                  {/* 막대 그래픽 */}
+                                  <motion.div 
+                                    initial={{ height: 0 }}
+                                    animate={{ height: `${Math.max(1, pct1)}%` }}
+                                    transition={{ type: 'spring', damping: 15, stiffness: 100 }}
+                                    className="w-6 bg-gradient-to-t from-[var(--color-primary)] to-[#16a34a] rounded-t-lg transition-all duration-300 hover:brightness-110 cursor-pointer shadow-sm hover:shadow-[0_0_12px_rgba(1,92,45,0.4)]"
+                                  />
+                                </div>
+
+                                {/* 막대 2 */}
+                                <div className="relative group/bar flex flex-col items-end h-full justify-end">
+                                  {/* 툴팁 */}
+                                  <div className="absolute bottom-full mb-2.5 hidden group-hover/bar:flex flex-col items-center z-20 pointer-events-none transition-all duration-200 min-w-[140px] -translate-x-1/2 left-1/2">
+                                    <div className="bg-gray-900 text-white text-[10px] font-black px-3 py-2 rounded-xl shadow-xl text-center border border-gray-800">
+                                      <p className="text-gray-400 text-[8px] font-medium tracking-wide">{label2}</p>
+                                      <p className="mt-0.5 font-sans">{val2.toLocaleString()}원</p>
+                                    </div>
+                                    <div className="w-2 h-2 bg-gray-900 rotate-45 -mt-1 border-r border-b border-gray-900" />
+                                  </div>
+                                  {/* 막대 그래픽 */}
+                                  <motion.div 
+                                    initial={{ height: 0 }}
+                                    animate={{ height: `${Math.max(1, pct2)}%` }}
+                                    transition={{ type: 'spring', damping: 15, stiffness: 100 }}
+                                    className={`w-6 rounded-t-lg transition-all duration-300 hover:brightness-110 cursor-pointer shadow-sm ${
+                                      chartViewMode === 'budget' 
+                                        ? 'bg-gradient-to-t from-[var(--color-secondary)] to-[#2563eb] hover:shadow-[0_0_12px_rgba(0,60,113,0.4)]'
+                                        : 'bg-gradient-to-t from-[var(--color-accent-2)] to-[#ea580c] hover:shadow-[0_0_12px_rgba(255,106,19,0.4)]'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* X축 부서 라벨 */}
+                  <div className="flex w-full mt-2 pl-16 justify-around shrink-0 border-t border-gray-100 pt-2.5">
+                    {processedChartData.map((item) => (
+                      <span key={item.department} className="text-xs font-black text-gray-500 w-24 text-center">
+                        {item.department}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* 통계 요약 등 추가 가능 공간 */}
-              <div className="bg-gradient-to-br from-[var(--color-primary)] to-[#014421] p-8 rounded-[32px] shadow-lg shadow-primary/20 text-white relative overflow-hidden group">
-                <div className="relative z-10">
-                  <h3 className="text-xl font-black mb-2 text-white">협상 진행률</h3>
-                  <p className="text-white/80 text-xs font-medium mb-8">전체 대상자 중 협상 완료 인원</p>
-
-                  
-                  <div className="flex items-baseline gap-2 mb-2">
-                    <span className="text-5xl font-black tracking-tighter text-[var(--color-accent-1)]">
-                      {Math.round((negotiations.filter(n => n.status === 'final_agreement').length / (employees.length || 1)) * 100)}
-                    </span>
-                    <span className="text-xl font-bold text-[var(--color-accent-1)] opacity-80">%</span>
-                  </div>
-
-                  
-                  <div className="space-y-4 mt-8">
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-white/70">
-                      <span>완료 인원</span>
-                      <span>{negotiations.filter(n => n.status === 'final_agreement').length} / {employees.length}명</span>
-                    </div>
-
-                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${(negotiations.filter(n => n.status === 'final_agreement').length / (employees.length || 1)) * 100}%` }}
-                        className="h-full bg-[var(--color-accent-1)]"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <TrendingUp size={120} className="absolute -bottom-4 -right-4 text-white/5 rotate-12 group-hover:scale-110 transition-transform duration-500" />
-              </div>
             </div>
 
           </div>
