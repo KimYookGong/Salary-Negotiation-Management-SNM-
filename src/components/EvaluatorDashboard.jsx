@@ -768,6 +768,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         )
       );
       
+      const histories = emp.employee_history || [];
+      const currHist = histories.find(h => h.year === currentYear);
+
       const baseInfo = {
         id: emp.employee_id,
         name: emp.full_name,
@@ -776,7 +779,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         salary: emp.current_salary
       };
 
-      if (!neg || neg.status === 'rejected' || neg.status === 'cancelled') {
+      // 당해 연도 이력이 이미 존재한다면 (이미 협상이 끝난 사람), 협상 테이블 데이터 유무와 상관없이 finalized로 강제 분류
+      if (currHist) {
+        cats.finalized.push({ ...baseInfo, type: 'history', data: currHist, proposal: currHist.salary });
+      } else if (!neg || neg.status === 'rejected' || neg.status === 'cancelled') {
         cats.not_proposed.push({ ...baseInfo, type: 'employee', data: emp });
       } else if (neg.status === 'submitted' || neg.status === 'under_review') {
         cats.proposed.push({ ...baseInfo, type: 'negotiation', data: neg, proposal: neg.evaluator_proposal });
@@ -849,7 +855,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         // 이전 년도 히스토리 확인하여 currentVal이 0일 경우 fallback
         if (currentVal === 0) {
           const prevHist = histories.find(h => h.year === currentYear - 1);
-          currentVal = prevHist ? Number(prevHist.salary) : 0;
+          currentVal = prevHist ? Number(prevHist.salary) : Number(emp.current_salary || 0);
         }
         
         rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
@@ -862,7 +868,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         
         // 직전 연도 히스토리 조회
         const prevHist = histories.find(h => h.year === currentYear - 1);
-        currentVal = prevHist ? Number(prevHist.salary || 0) : 0;
+        // 신규 입사자의 경우 직전 이력이 없으므로 당해 히스토리 연봉 또는 사원 테이블 연봉을 fallback으로 셋팅
+        currentVal = prevHist ? Number(prevHist.salary || 0) : Number(currHist.salary || emp.current_salary || 0);
         
         rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
         rating = currHist.performance_rating || '-';
