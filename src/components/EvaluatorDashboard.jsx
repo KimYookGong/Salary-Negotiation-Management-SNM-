@@ -158,12 +158,12 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation
         {/* 좌우 2컬럼 레이아웃 적용 */}
         <div className="grid grid-cols-2 gap-8 items-start">
           
-          {/* [좌측 컬럼] 사원 직무기술서 및 협상 근거 자료 */}
-          <div className="space-y-6 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+          {/* [좌측 컬럼] 사원 직무기술서 및 협상 근거 자료 (우측 폼과 대칭 정렬을 맞춘 칼정렬 개별 고정 높이 뷰) */}
+          <div className="space-y-6">
             {/* 직무기술서 섹션 */}
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">직무기술서</span>
-              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 min-h-[120px] shadow-sm">
+              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 h-[170px] overflow-y-auto custom-scrollbar shadow-sm">
                 <p className="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-line">
                   {negotiation?.jd || '등록된 직무기술서 내용이 존재하지 않습니다.'}
                 </p>
@@ -171,9 +171,9 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation
             </div>
 
             {/* 연봉 요구 근거 섹션 */}
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">인상 요구 및 타당성 근거</span>
-              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 min-h-[160px] shadow-sm">
+              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 h-[170px] overflow-y-auto custom-scrollbar shadow-sm">
                 <p className="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-line">
                   {negotiation?.reason || '등록된 협상 인상 근거 자료가 존재하지 않습니다.'}
                 </p>
