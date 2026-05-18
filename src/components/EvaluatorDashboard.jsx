@@ -1535,13 +1535,23 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                     </div>
                   </div>
 
-                  {/* X축 부서 라벨 */}
-                  <div className="flex w-full mt-2 pl-16 justify-around shrink-0 border-t border-gray-100 pt-2.5">
-                    {processedChartData.map((item) => (
-                      <span key={item.department} className="text-xs font-black text-gray-500 w-24 text-center">
-                        {item.department}
-                      </span>
-                    ))}
+                  {/* X축 부서 라벨 (Y축 너비 w-16과 대칭 정렬을 위한 더미 영역 삽입 및 세로 눈금선 추가) */}
+                  <div className="flex w-full mt-2.5 shrink-0 border-t border-gray-100 pt-3">
+                    <div className="w-16 shrink-0" />
+                    <div className="flex-1 flex justify-around">
+                      {processedChartData.map((item) => (
+                        <div 
+                          key={item.department} 
+                          className="flex flex-col items-center w-24 group/label cursor-default"
+                        >
+                          {/* 미니 세로 눈금선 (Tick) 으로 X축 연동 시각화 */}
+                          <div className="w-[1.5px] h-1.5 bg-gray-200 group-hover/label:bg-[var(--color-primary)] transition-colors duration-300 -mt-[13px] mb-2" />
+                          <span className="text-[11px] font-black text-gray-400 group-hover/label:text-gray-900 transition-colors duration-300 text-center tracking-tight px-2.5 py-1 rounded-full group-hover/label:bg-gray-50">
+                            {item.department}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
