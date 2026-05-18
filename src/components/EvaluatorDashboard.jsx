@@ -1184,12 +1184,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[480px] hover:border-[var(--color-primary)]/20 transition-all duration-300 relative">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-emerald-50 rounded-2xl text-[var(--color-primary)] relative flex items-center justify-center">
-                        <TrendingUp size={18} />
-                      </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h3 className="text-base font-black text-gray-900">📊 성과-보상 사분면 차트</h3>
+                          <h3 className="text-base font-black text-gray-900">성과-보상 사분면 차트</h3>
                         </div>
                         <p className="text-[10px] text-gray-400 font-medium">X축: 성과 등급 (D~S) | Y축: 요구 인상률 (%)</p>
                       </div>
@@ -1204,7 +1201,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                     </div>
                     <div className="bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100 text-center hover:bg-gray-50 hover:scale-[1.02] transition-all duration-300">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">평균 연봉</p>
-                      <p className="text-sm font-black text-gray-900">{formatChartYLabel(avgStats.salary)}원</p>
+                      <p className="text-sm font-black text-gray-900">{formatCurrencySimple(avgStats.salary)}</p>
                     </div>
                     <div className="bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100 text-center hover:bg-gray-50 hover:scale-[1.02] transition-all duration-300">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">평균 인상률</p>
