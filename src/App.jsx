@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import EvaluateeDashboard from './components/EvaluateeDashboard';
 import EvaluatorDashboard from './components/EvaluatorDashboard';
 import Auth from './components/Auth';
+import AiAssistant from './components/AiAssistant';
 
 function App() {
   const [session, setSession] = useState(null);
@@ -229,6 +230,10 @@ function App() {
       return userRole === 'evaluator' 
         ? <EvaluatorDashboard profile={profile} currentTab={currentTab} currentYear={currentYear} /> 
         : <EvaluateeDashboard profile={profile} currentYear={currentYear} />;
+    }
+
+    if (currentTab === 'ai') {
+      return <AiAssistant profile={profile} userRole={userRole} currentYear={currentYear} />;
     }
     
     return <div className="p-12 text-center text-gray-400">준비 중인 페이지입니다.</div>;
