@@ -211,7 +211,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation
             <div className="space-y-2">
               <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">검토 의견</span>
               <textarea 
-                className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none h-32 text-sm font-medium transition-all placeholder:text-gray-300 resize-none"
+                className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none h-[170px] text-sm font-medium transition-all placeholder:text-gray-300 resize-none"
                 placeholder="검토 의견을 성실히 입력해 주세요."
                 value={comment} 
                 onChange={(e) => setComment(e.target.value)}
@@ -224,7 +224,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation
           <button onClick={onClose} className="flex-1 py-4 text-sm font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">취소</button>
           <button 
             onClick={() => onConfirm(offer, comment)}
-            className="flex-2 py-4 px-8 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="flex-1 py-4 px-8 bg-[var(--color-primary)] text-white text-base font-black rounded-2xl shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
             제시안 전송
           </button>
