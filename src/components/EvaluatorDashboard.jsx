@@ -129,6 +129,11 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
 
   if (!isOpen) return null;
 
+  // 현재 제안 숫자를 안전하게 정수로 파싱하여 통화 포맷팅
+  const cleanProposal = typeof currentProposal === 'string' 
+    ? Number(currentProposal.replace(/[^0-9]/g, '')) 
+    : Number(currentProposal || 0);
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
       <motion.div 
@@ -140,9 +145,10 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
         initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
         className="bg-white rounded-3xl p-10 w-full max-w-lg shadow-2xl relative z-10 border border-gray-100"
       >
-        <div className="flex justify-between items-start mb-8">
+        <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
           <div>
             <h3 className="text-2xl font-black text-gray-900 mb-1">조건 제시</h3>
+            <p className="text-xs font-bold text-gray-400">{name} 사원의 연봉 협상 수정 제안</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-50 rounded-xl transition-all">
             <X size={24} className="text-gray-400" />
@@ -150,13 +156,21 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
         </div>
 
         <div className="space-y-6">
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
-            <p className="text-lg font-black text-gray-900">{currentProposal}</p>
+          {/* 사원 최종 요구안 */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">사원 최종 요구안</span>
+            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+              <span className="text-sm font-bold text-gray-500">요구 연봉</span>
+              <span className="text-lg font-black text-gray-900">{formatCurrency(cleanProposal)}</span>
+            </div>
           </div>
 
-          <div>
+          {/* 회사 제안 연봉 */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">회사 제안 연봉</span>
             <input 
-              type="text" className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 text-lg font-black text-[var(--color-primary)]"
+              type="text" 
+              className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none text-lg font-black text-[var(--color-primary)] transition-all placeholder:text-gray-300"
               placeholder="제시 연봉 (예: 72,000,000원)" 
               value={formatInputCurrency(offer)} 
               onChange={(e) => {
@@ -166,11 +180,14 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
             />
           </div>
 
-          <div>
+          {/* 검토 의견 */}
+          <div className="space-y-2">
+            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">검토 의견</span>
             <textarea 
-              className="w-full p-4 bg-gray-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-[var(--color-primary)]/10 h-32 text-sm font-medium"
-              placeholder="검토 의견을 입력하세요."
-              value={comment} onChange={(e) => setComment(e.target.value)}
+              className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none h-32 text-sm font-medium transition-all placeholder:text-gray-300 resize-none"
+              placeholder="검토 의견을 성실히 입력해 주세요."
+              value={comment} 
+              onChange={(e) => setComment(e.target.value)}
             />
           </div>
         </div>
