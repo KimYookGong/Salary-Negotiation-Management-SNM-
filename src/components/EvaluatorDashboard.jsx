@@ -1004,7 +1004,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     }
   }, [isBudgetEmpty]);
 
-  // 차트 뷰모드별 최댓값 설정 (비율 계산 및 Y축용)
+  // 차트 뷰모드별 최댓값 설정 (비율 계산 및 Y축용 - 눈금이 1000만 단위 등으로 깔끔하게 끊어지도록 보정)
   const maxChartValue = React.useMemo(() => {
     let max = 0;
     processedChartData.forEach(item => {
@@ -1016,8 +1016,20 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         if (item.proposal.value2 > max) max = item.proposal.value2;
       }
     });
+    
     // 나눗셈 0 방지 및 시각적 안정감을 위해 15% 마진 적용
-    return max > 0 ? max * 1.15 : 10000000;
+    const rawMax = max > 0 ? max * 1.15 : 10000000;
+    const rawStep = rawMax / 4;
+    
+    // 눈금 단위(step)를 1000만원 이상일 때는 1000만원 단위로 올림, 1000만원 미만일 때는 100만원 단위로 올림하여 끝전 처리
+    let step;
+    if (rawStep >= 10000000) {
+      step = Math.ceil(rawStep / 10000000) * 10000000;
+    } else {
+      step = Math.ceil(rawStep / 1000000) * 1000000;
+    }
+    
+    return step * 4;
   }, [processedChartData, chartViewMode]);
 
   // 한국식 큰 금액 포맷터 (예: 1.2억원, 8,500만원)
