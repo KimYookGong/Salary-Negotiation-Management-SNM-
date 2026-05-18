@@ -810,34 +810,86 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
   // [개편 위젯 B용] 성과-보상 사분면 차트 데이터 가공
   const scatterData = React.useMemo(() => {
-    return negotiations.map(neg => {
-      // 1. 제안 금액 파싱 (사원 요구안 최우선, 없으면 평가자 제안 fallback)
-      const propStr = String(neg.evaluatee_proposal || neg.evaluator_proposal || '');
-      const cleanProp = propStr.replace(/[^0-9.-]/g, '');
-      const proposalVal = parseFloat(cleanProp) || 0;
+    const list = [];
+    
+    employees.forEach(emp => {
+      // 1. 해당 사원의 선택된 연도 협상안 찾기
+      const neg = negotiations.find(n => 
+        n.year === currentYear && 
+        (n.employee_id === emp.employee_id || (n.evaluatee_name === emp.full_name && n.department === emp.department))
+      );
       
-      // 2. 현재 연봉 보정 (협상 데이터가 0이면 사원 목록에서 매핑)
-      const empInfo = employees.find(e => e.employee_id === neg.employee_id || e.full_name === neg.evaluatee_name);
-      const currentVal = (neg.current_salary && Number(neg.current_salary) > 0)
-        ? Number(neg.current_salary)
-        : (empInfo ? Number(empInfo.current_salary) : 0);
+      // 2. 해당 사원의 선택된 연도 히스토리 레코드 찾기
+      const histories = emp.employee_history || [];
+      const currHist = histories.find(h => h.year === currentYear);
       
-      // 3. 인상률 계산 (제안이 있고 현재 연봉이 있으면 계산, 제안이 없거나 동일하면 0)
-      const rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
+      // 협상안 또는 당해 연도 히스토리 둘 중 하나라도 존재해야 플로팅 대상이 됨
+      if (!neg && !currHist) return;
+      
+      let proposalVal = 0;
+      let currentVal = 0;
+      let rate = 0;
+      let rating = '-';
+      let status = 'not_proposed';
+      let id = emp.employee_id;
+      let name = emp.full_name;
+      let dept = emp.department;
+      let pos = emp.position;
+      
+      if (neg) {
+        // 협상 진행 중인 경우: 협상 테이블 기준
+        const propStr = String(neg.evaluatee_proposal || neg.evaluator_proposal || '');
+        const cleanProp = propStr.replace(/[^0-9.-]/g, '');
+        proposalVal = parseFloat(cleanProp) || 0;
+        
+        currentVal = (neg.current_salary && Number(neg.current_salary) > 0)
+          ? Number(neg.current_salary)
+          : Number(emp.current_salary || 0);
+        
+        // 이전 년도 히스토리 확인하여 currentVal이 0일 경우 fallback
+        if (currentVal === 0) {
+          const prevHist = histories.find(h => h.year === currentYear - 1);
+          currentVal = prevHist ? Number(prevHist.salary) : 0;
+        }
+        
+        rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
+        rating = neg.performance_rating || emp.performance_rating || '-';
+        status = neg.status;
+        pos = neg.position || emp.position;
+      } else if (currHist) {
+        // 과거 완료된 히스토리 정보만 있는 경우: 히스토리 기준
+        proposalVal = Number(currHist.salary || 0);
+        
+        // 직전 연도 히스토리 조회
+        const prevHist = histories.find(h => h.year === currentYear - 1);
+        currentVal = prevHist ? Number(prevHist.salary || 0) : 0;
+        
+        rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
+        rating = currHist.performance_rating || '-';
+        status = 'final_agreement'; // 과거 이력은 완료된 것으로 간주
+        pos = currHist.position || emp.position;
+      }
       
       const ratingMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
-      const score = ratingMap[neg.performance_rating] || 3;
+      const score = ratingMap[rating] || 3;
       
-      return {
-        ...neg,
+      list.push({
+        id,
+        evaluatee_name: name,
+        department: dept,
+        position: pos,
+        performance_rating: rating,
+        status,
         x: score,
         y: rate,
         proposalVal,
         currentVal,
         rateFormatted: rate.toFixed(1)
-      };
+      });
     });
-  }, [negotiations, employees]);
+    
+    return list;
+  }, [negotiations, employees, currentYear]);
 
   // 대시보드 필터(부서, 직급)에 따라 scatterData 실시간 필터링
   const filteredScatterData = React.useMemo(() => {
