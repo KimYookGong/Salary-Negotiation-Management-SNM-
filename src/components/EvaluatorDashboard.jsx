@@ -467,9 +467,17 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   const [hoveredDot, setHoveredDot] = useState(null); // 성과-보상 차트 호버된 점 정보
 
   
-  const [dbSearchTerm, setDbSearchTerm] = useState('');
-  const [dbDeptFilter, setDbDeptFilter] = useState('전체');
-  const [dbPosFilter, setDbPosFilter] = useState('전체');
+  // [개선] 각 탭별 독립형 필터 상태 분리 선언
+  const [dashDeptFilter, setDashDeptFilter] = useState('전체');
+  const [dashPosFilter, setDashPosFilter] = useState('전체');
+
+  const [empSearchTerm, setEmpSearchTerm] = useState('');
+  const [empDeptFilter, setEmpDeptFilter] = useState('전체');
+  const [empPosFilter, setEmpPosFilter] = useState('전체');
+
+  const [negSearchTerm, setNegSearchTerm] = useState('');
+  const [negDeptFilter, setNegDeptFilter] = useState('전체');
+  const [negPosFilter, setNegPosFilter] = useState('전체');
   const [sortConfig, setSortConfig] = useState({ key: 'full_name', direction: 'asc' });
   const [isSalaryPopupOpen, setIsSalaryPopupOpen] = useState(false);
   const [selectedEmployeeForSalary, setSelectedEmployeeForSalary] = useState(null);
@@ -519,10 +527,16 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         `);
 
       if (empsError) throw empsError;
+
+      // [추가] 프로필 정보 함께 조회하여 매칭 보완 (히스토리가 없는 신입 사원 대응)
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('employee_id, current_salary, position, performance_rating');
       
       // 데이터 평탄화 (사원현황 탭은 최신 데이터, 대시보드는 선택 연도 데이터)
       const flattenedEmps = emps?.map(emp => {
         const histories = emp.employee_history || [];
+        const profileInfo = profs?.find(p => p.employee_id === emp.employee_id);
         
         let activeHist;
         if (currentTab === 'dashboard') {
@@ -537,9 +551,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
         return {
           ...emp,
-          position: data.position || emp.position,
-          current_salary: data.salary || 0,
-          performance_rating: data.performance_rating || '-'
+          position: data.position || profileInfo?.position || emp.position,
+          current_salary: data.salary || profileInfo?.current_salary || 0,
+          performance_rating: data.performance_rating || profileInfo?.performance_rating || '-'
         };
       }) || [];
       
@@ -714,9 +728,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
   const filteredEmployees = React.useMemo(() => {
     return employees.filter(emp => {
-      const matchSearch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
-      const matchDept = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
-      const matchPos = dbPosFilter === '전체' || emp.position === dbPosFilter;
+      const matchSearch = !empSearchTerm || emp.full_name.toLowerCase().includes(empSearchTerm.toLowerCase());
+      const matchDept = empDeptFilter === '전체' || emp.department === empDeptFilter;
+      const matchPos = empPosFilter === '전체' || emp.position === empPosFilter;
       return matchSearch && matchDept && matchPos;
     }).sort((a, b) => {
       if (sortConfig.key === 'performance_rating') {
@@ -729,7 +743,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
       if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [employees, dbSearchTerm, dbDeptFilter, dbPosFilter, sortConfig]);
+  }, [employees, empSearchTerm, empDeptFilter, empPosFilter, sortConfig]);
 
   const categorizedEmployees = React.useMemo(() => {
     const cats = {
@@ -741,9 +755,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
     employees.forEach(emp => {
       // 검색 및 부서 필터링 적용
-      const searchMatch = !dbSearchTerm || emp.full_name.toLowerCase().includes(dbSearchTerm.toLowerCase());
-      const deptMatch = dbDeptFilter === '전체' || emp.department === dbDeptFilter;
-      const posMatch = dbPosFilter === '전체' || emp.position === dbPosFilter;
+      const searchMatch = !negSearchTerm || emp.full_name.toLowerCase().includes(negSearchTerm.toLowerCase());
+      const deptMatch = negDeptFilter === '전체' || emp.department === negDeptFilter;
+      const posMatch = negPosFilter === '전체' || emp.position === negPosFilter;
       
       if (!searchMatch || !deptMatch || !posMatch) return;
 
@@ -774,18 +788,18 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
     });
 
     return cats;
-  }, [employees, negotiations, dbSearchTerm, dbDeptFilter, dbPosFilter]);
+  }, [employees, negotiations, negSearchTerm, negDeptFilter, negPosFilter, currentYear]);
 
   const filteredNegotiations = negotiations.filter(neg => neg.evaluatee_name.toLowerCase().includes(searchTerm.toLowerCase()) || neg.department.toLowerCase().includes(searchTerm.toLowerCase()));
   const departments = ['개발팀', '디자인팀', '마케팅팀', '운영팀', '인사팀'];
 
   const totalDeptsUsed = budgets.depts.reduce((sum, d) => sum + (d.used_budget || 0), 0);
-  const currentBudgetContext = dbDeptFilter === '전체' 
+  const currentBudgetContext = dashDeptFilter === '전체' 
     ? { limit: budgets.company?.total_budget || 1, used: totalDeptsUsed, label: '회사 전체' }
     : { 
-        limit: budgets.depts.find(d => d.department_name === dbDeptFilter)?.total_budget || 1, 
-        used: budgets.depts.find(d => d.department_name === dbDeptFilter)?.used_budget || 0, 
-        label: dbDeptFilter 
+        limit: budgets.depts.find(d => d.department_name === dashDeptFilter)?.total_budget || 1, 
+        used: budgets.depts.find(d => d.department_name === dashDeptFilter)?.used_budget || 0, 
+        label: dashDeptFilter 
       };
   const budgetPercentage = (currentBudgetContext.used / currentBudgetContext.limit) * 100;
 
@@ -797,12 +811,19 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
   // [개편 위젯 B용] 성과-보상 사분면 차트 데이터 가공
   const scatterData = React.useMemo(() => {
     return negotiations.map(neg => {
-      const propStr = neg.evaluatee_proposal || '';
+      // 1. 제안 금액 파싱 (사원 요구안 최우선, 없으면 평가자 제안 fallback)
+      const propStr = String(neg.evaluatee_proposal || neg.evaluator_proposal || '');
       const cleanProp = propStr.replace(/[^0-9.-]/g, '');
       const proposalVal = parseFloat(cleanProp) || 0;
-      const currentVal = Number(neg.current_salary || 0);
       
-      const rate = currentVal > 0 ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
+      // 2. 현재 연봉 보정 (협상 데이터가 0이면 사원 목록에서 매핑)
+      const empInfo = employees.find(e => e.employee_id === neg.employee_id || e.full_name === neg.evaluatee_name);
+      const currentVal = (neg.current_salary && Number(neg.current_salary) > 0)
+        ? Number(neg.current_salary)
+        : (empInfo ? Number(empInfo.current_salary) : 0);
+      
+      // 3. 인상률 계산 (제안이 있고 현재 연봉이 있으면 계산, 제안이 없거나 동일하면 0)
+      const rate = (currentVal > 0 && proposalVal > 0) ? ((proposalVal - currentVal) / currentVal) * 100 : 0;
       
       const ratingMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
       const score = ratingMap[neg.performance_rating] || 3;
@@ -816,23 +837,64 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         rateFormatted: rate.toFixed(1)
       };
     });
-  }, [negotiations]);
+  }, [negotiations, employees]);
+
+  // 대시보드 필터(부서, 직급)에 따라 scatterData 실시간 필터링
+  const filteredScatterData = React.useMemo(() => {
+    return scatterData.filter(item => {
+      const matchDept = dashDeptFilter === '전체' || item.department === dashDeptFilter;
+      const matchPos = dashPosFilter === '전체' || item.position === dashPosFilter;
+      return matchDept && matchPos;
+    });
+  }, [scatterData, dashDeptFilter, dashPosFilter]);
+
+  // 실시간 평균 지표 (평균 등급, 평균 연봉, 평균 인상률) 계산
+  const avgStats = React.useMemo(() => {
+    if (filteredScatterData.length === 0) {
+      return { rating: '-', salary: 0, rate: 0 };
+    }
+    
+    // 평균 등급 계산
+    const ratingMap = { 'S': 5, 'A': 4, 'B': 3, 'C': 2, 'D': 1 };
+    const reverseRatingMap = { 5: 'S', 4: 'A', 3: 'B', 2: 'C', 1: 'D' };
+    
+    const totalScore = filteredScatterData.reduce((sum, item) => {
+      const score = ratingMap[item.performance_rating] || 3;
+      return sum + score;
+    }, 0);
+    const avgScore = Math.round(totalScore / filteredScatterData.length);
+    const avgRating = reverseRatingMap[avgScore] || 'B';
+    
+    // 평균 연봉 계산
+    const totalSalary = filteredScatterData.reduce((sum, item) => sum + item.currentVal, 0);
+    const avgSalary = Math.round(totalSalary / filteredScatterData.length);
+    
+    // 평균 인상률 계산
+    const totalRate = filteredScatterData.reduce((sum, item) => sum + item.y, 0);
+    const avgRate = totalRate / filteredScatterData.length;
+    
+    return {
+      rating: avgRating,
+      salary: avgSalary,
+      rate: avgRate
+    };
+  }, [filteredScatterData]);
 
   // 성과-보상 차트용 평균 요구 인상률
   const avgScatterRate = React.useMemo(() => {
-    if (scatterData.length === 0) return 5.0; // 협상안이 없을 경우 기본 5%선 표시
-    const total = scatterData.reduce((sum, item) => sum + item.y, 0);
-    const avg = total / scatterData.length;
+    if (filteredScatterData.length === 0) return 5.0; // 협상안이 없을 경우 기본 5%선 표시
+    const total = filteredScatterData.reduce((sum, item) => sum + item.y, 0);
+    const avg = total / filteredScatterData.length;
     return Math.max(0, avg); // 음수 방지
-  }, [scatterData]);
+  }, [filteredScatterData]);
 
   // 성과-보상 차트용 Y축 최댓값 (최소 15% 한도선 적용)
   const maxScatterY = React.useMemo(() => {
-    if (scatterData.length === 0) return 20;
-    const rates = scatterData.map(item => item.y);
+    if (filteredScatterData.length === 0) return 20;
+    const rates = filteredScatterData.map(item => item.y);
     const maxVal = Math.max(...rates, 15);
     return Math.ceil(maxVal / 5) * 5; // 5% 단위로 반올림
-  }, [scatterData]);
+  }, [filteredScatterData]);
 
   // [개편 위젯 C용] 부서별 예산 현황 차트 데이터 가공
   const processedChartData = React.useMemo(() => {
@@ -928,15 +990,24 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                   <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                   데이터 새로고침
                 </button>
-                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-200 shadow-sm">
+                <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-2xl border border-gray-200 shadow-sm">
                   <Filter size={16} className="text-gray-400" />
                   <select 
-                    className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[120px]" 
-                    value={dbDeptFilter} 
-                    onChange={(e) => setDbDeptFilter(e.target.value)}
+                    className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[110px]" 
+                    value={dashDeptFilter} 
+                    onChange={(e) => setDashDeptFilter(e.target.value)}
                   >
                     <option value="전체">회사 전체</option>
                     {departments.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <div className="w-[1px] h-4 bg-gray-200 mx-1" />
+                  <select 
+                    className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[90px]" 
+                    value={dashPosFilter} 
+                    onChange={(e) => setDashPosFilter(e.target.value)}
+                  >
+                    <option value="전체">전체 직급</option>
+                    {POSITION_SEQUENCE.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
               </div>
@@ -992,7 +1063,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
                 {/* [위젯 A] 즉시 검토 대기열 */}
-                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-[var(--color-primary)]/20 transition-all duration-300">
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[480px] hover:border-[var(--color-primary)]/20 transition-all duration-300">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-orange-50 rounded-2xl text-orange-500 relative flex items-center justify-center">
@@ -1056,7 +1127,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 </div>
 
                 {/* [위젯 B] 성과-보상 사분면 차트 */}
-                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[340px] hover:border-[var(--color-primary)]/20 transition-all duration-300 relative">
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 flex flex-col h-[480px] hover:border-[var(--color-primary)]/20 transition-all duration-300 relative">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-50 shrink-0">
                     <div className="flex items-center gap-3">
                       <div className="p-2.5 bg-emerald-50 rounded-2xl text-[var(--color-primary)] relative flex items-center justify-center">
@@ -1071,12 +1142,28 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                     </div>
                   </div>
 
+                  {/* 평균 인사 지표 3칸 카드 */}
+                  <div className="grid grid-cols-3 gap-3 mb-4 px-1 shrink-0">
+                    <div className="bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100 text-center hover:bg-gray-50 hover:scale-[1.02] transition-all duration-300">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">평균 등급</p>
+                      <p className="text-sm font-black text-[var(--color-primary)]">{avgStats.rating} 등급</p>
+                    </div>
+                    <div className="bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100 text-center hover:bg-gray-50 hover:scale-[1.02] transition-all duration-300">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">평균 연봉</p>
+                      <p className="text-sm font-black text-gray-900">{formatChartYLabel(avgStats.salary)}원</p>
+                    </div>
+                    <div className="bg-gray-50/70 p-2.5 rounded-2xl border border-gray-100 text-center hover:bg-gray-50 hover:scale-[1.02] transition-all duration-300">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-wider mb-0.5">평균 인상률</p>
+                      <p className="text-sm font-black text-[var(--color-secondary)]">{avgStats.rate.toFixed(1)}%</p>
+                    </div>
+                  </div>
+
                   <div className="flex-1 relative min-h-0 w-full">
-                    {scatterData.length > 0 ? (
+                    {filteredScatterData.length > 0 ? (
                       (() => {
-                        const margin = { top: 20, right: 20, bottom: 35, left: 45 };
-                        const width = 400;
-                        const height = 240;
+                        const margin = { top: 25, right: 25, bottom: 40, left: 55 };
+                        const width = 520;
+                        const height = 360;
                         const innerWidth = width - margin.left - margin.right;
                         const innerHeight = height - margin.top - margin.bottom;
 
@@ -1141,10 +1228,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                               />
 
                               {/* 2. 4분면 텍스트 가이드 라벨 */}
-                              <text x={margin.left + 8} y={margin.top + 13} fontSize="8" fontWeight="bold" fill="#EF4444" fillOpacity="0.4" textAnchor="start">조정 필요</text>
-                              <text x={width - margin.right - 8} y={margin.top + 13} fontSize="8" fontWeight="bold" fill="#10B981" fillOpacity="0.4" textAnchor="end">핵심 인재</text>
-                              <text x={margin.left + 8} y={height - margin.bottom - 8} fontSize="8" fontWeight="bold" fill="#6B7280" fillOpacity="0.4" textAnchor="start">적정 수준</text>
-                              <text x={width - margin.right - 8} y={height - margin.bottom - 8} fontSize="8" fontWeight="bold" fill="#3B82F6" fillOpacity="0.4" textAnchor="end">이탈 관리</text>
+                              <text x={margin.left + 12} y={margin.top + 18} fontSize="11" fontWeight="bold" fill="#EF4444" fillOpacity="0.5" textAnchor="start">조정 필요</text>
+                              <text x={width - margin.right - 12} y={margin.top + 18} fontSize="11" fontWeight="bold" fill="#10B981" fillOpacity="0.5" textAnchor="end">핵심 인재</text>
+                              <text x={margin.left + 12} y={height - margin.bottom - 12} fontSize="11" fontWeight="bold" fill="#6B7280" fillOpacity="0.5" textAnchor="start">적정 수준</text>
+                              <text x={width - margin.right - 12} y={height - margin.bottom - 12} fontSize="11" fontWeight="bold" fill="#3B82F6" fillOpacity="0.5" textAnchor="end">이탈 관리</text>
 
                               {/* 3. Y축 그리드 라인 & 레이블 */}
                               {yTicks.map(tick => {
@@ -1152,7 +1239,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                 return (
                                   <g key={tick}>
                                     <line x1={margin.left} y1={yPixel} x2={width - margin.right} y2={yPixel} stroke="#F1F5F9" strokeWidth="1" />
-                                    <text x={margin.left - 8} y={yPixel + 3} textAnchor="end" fontSize="8" fill="#94A3B8">{tick}%</text>
+                                    <text x={margin.left - 8} y={yPixel + 3} textAnchor="end" fontSize="10" fill="#94A3B8">{tick}%</text>
                                   </g>
                                 );
                               })}
@@ -1163,7 +1250,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                 return (
                                   <g key={tick.score}>
                                     <line x1={xPixel} y1={margin.top} x2={xPixel} y2={height - margin.bottom} stroke="#F8FAFC" strokeWidth="1" />
-                                    <text x={xPixel} y={height - margin.bottom + 14} textAnchor="middle" fontSize="9" fontWeight="bold" fill="#64748B">{tick.label}</text>
+                                    <text x={xPixel} y={height - margin.bottom + 16} textAnchor="middle" fontSize="11" fontWeight="bold" fill="#64748B">{tick.label}</text>
                                   </g>
                                 );
                               })}
@@ -1175,10 +1262,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                               <line x1={margin.left} y1={ySplit} x2={width - margin.right} y2={ySplit} stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="3 3" />
                               
                               {/* 평균 인상률 텍스트 표시 */}
-                              <text x={width - margin.right - 5} y={ySplit - 4} fontSize="7" fontWeight="bold" fill="#94A3B8" textAnchor="end">평균 요구율 ({avgScatterRate.toFixed(1)}%)</text>
+                              <text x={width - margin.right - 5} y={ySplit - 6} fontSize="9" fontWeight="bold" fill="#94A3B8" textAnchor="end">평균 요구율 ({avgScatterRate.toFixed(1)}%)</text>
 
                               {/* 6. 사원 개별 데이터 점 */}
-                              {scatterData.map((d, index) => {
+                              {filteredScatterData.map((d, index) => {
                                 const xPixel = getXPixel(d.x);
                                 const yPixel = getYPixel(d.y);
                                 const isHovered = hoveredDot?.id === d.id;
@@ -1200,10 +1287,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                     key={d.id || index}
                                     cx={xPixel}
                                     cy={yPixel}
-                                    r={isHovered ? 8 : 5}
+                                    r={isHovered ? 9 : 6}
                                     fill={dotColor}
                                     stroke="white"
-                                    strokeWidth={isHovered ? 2.5 : 1}
+                                    strokeWidth={isHovered ? 3 : 1}
                                     className="cursor-pointer transition-all duration-200"
                                     opacity="0.85"
                                     onMouseEnter={() => setHoveredDot({ ...d, xPixel, yPixel })}
@@ -1215,9 +1302,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
                               {/* 7. 반응형 경계 감지 스마트 SVG 툴팁 */}
                               {hoveredDot && (() => {
-                                const isTooltipAbove = hoveredDot.yPixel >= 75;
+                                const isTooltipAbove = hoveredDot.yPixel >= 85;
                                 const tooltipY = isTooltipAbove ? hoveredDot.yPixel - 15 : hoveredDot.yPixel + 15;
-                                const tooltipRectY = isTooltipAbove ? -68 : 8;
+                                const tooltipRectY = isTooltipAbove ? -78 : 8;
                                 const pointerPoints = isTooltipAbove 
                                   ? "0,0 -5,-5 5,-5" 
                                   : "0,0 -5,5 5,5";
@@ -1226,22 +1313,22 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                   <g transform={`translate(${hoveredDot.xPixel}, ${tooltipY})`} className="pointer-events-none z-50">
                                     {/* 툴팁 어두운 배경 */}
                                     <rect 
-                                      x="-75" 
+                                      x="-85" 
                                       y={tooltipRectY} 
-                                      width="150" 
-                                      height="60" 
-                                      rx="8" 
+                                      width="170" 
+                                      height="70" 
+                                      rx="12" 
                                       fill="#1E293B" 
                                       opacity="0.95" 
                                     />
                                     {/* 툴팁 텍스트 정보 */}
-                                    <text x="0" y={tooltipRectY + 18} fill="white" fontSize="9" fontWeight="bold" textAnchor="middle">
+                                    <text x="0" y={tooltipRectY + 20} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle">
                                       {hoveredDot.evaluatee_name} ({hoveredDot.performance_rating}등급)
                                     </text>
-                                    <text x="0" y={tooltipRectY + 34} fill="#94A3B8" fontSize="8" textAnchor="middle">
+                                    <text x="0" y={tooltipRectY + 38} fill="#94A3B8" fontSize="10" textAnchor="middle">
                                       현재: {formatChartYLabel(hoveredDot.currentVal)}원
                                     </text>
-                                    <text x="0" y={tooltipRectY + 48} fill="#A4D65E" fontSize="8" fontWeight="bold" textAnchor="middle">
+                                    <text x="0" y={tooltipRectY + 54} fill="#A4D65E" fontSize="10" fontWeight="bold" textAnchor="middle">
                                       요구 인상률: {hoveredDot.rateFormatted}%
                                     </text>
                                     {/* 말풍선 삼각형 꼬리 */}
@@ -1265,7 +1352,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               </div>
 
               {/* [위젯 C] 부서별 예산 현황 차트 */}
-              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 w-full min-h-[380px] hover:border-[var(--color-primary)]/20 transition-all duration-300 flex flex-col">
+              <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 w-full min-h-[440px] hover:border-[var(--color-primary)]/20 transition-all duration-300 flex flex-col">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shrink-0 pb-3 border-b border-gray-50 mb-6">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-green-50 rounded-2xl text-[var(--color-primary)] flex items-center justify-center">
@@ -1304,8 +1391,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 </div>
 
                 {/* 차트 캔버스 영역 */}
-                <div className="flex-1 flex flex-col justify-between min-h-[250px] relative mt-2">
-                  <div className="flex-1 w-full flex relative h-[210px]">
+                <div className="flex-1 flex flex-col justify-between min-h-[310px] relative mt-2">
+                  <div className="flex-1 w-full flex relative h-[270px]">
                     {/* Y축 눈금선 및 레이블 */}
                     <div className="w-16 h-full flex flex-col justify-between items-end pr-3.5 text-[9px] font-black text-gray-400 pb-5">
                       <span>{formatChartYLabel(maxChartValue)}</span>
@@ -1420,8 +1507,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <Filter size={16} className="text-gray-400" />
                 <select 
                   className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
-                  value={dbDeptFilter} 
-                  onChange={(e) => setDbDeptFilter(e.target.value)}
+                  value={empDeptFilter} 
+                  onChange={(e) => setEmpDeptFilter(e.target.value)}
                 >
                   <option value="전체">전체 부서</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1429,8 +1516,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <div className="w-[1px] h-4 bg-gray-200 mx-1" />
                 <select 
                   className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
-                  value={dbPosFilter} 
-                  onChange={(e) => setDbPosFilter(e.target.value)}
+                  value={empPosFilter} 
+                  onChange={(e) => setEmpPosFilter(e.target.value)}
                 >
                   <option value="전체">전체 직급</option>
                   {POSITION_SEQUENCE.map(p => <option key={p} value={p}>{p}</option>)}
@@ -1438,7 +1525,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               </div>
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
-                <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium outline-none" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
+                <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-gray-50 border-none rounded-xl w-64 text-sm font-medium outline-none" value={empSearchTerm} onChange={(e) => setEmpSearchTerm(e.target.value)} />
               </div>
             </div>
           </div>
@@ -1502,8 +1589,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <Filter size={16} className="text-gray-400" />
                 <select 
                   className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
-                  value={dbDeptFilter} 
-                  onChange={(e) => setDbDeptFilter(e.target.value)}
+                  value={negDeptFilter} 
+                  onChange={(e) => setNegDeptFilter(e.target.value)}
                 >
                   <option value="전체">전체 부서</option>
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
@@ -1511,8 +1598,8 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <div className="w-[1px] h-4 bg-gray-100 mx-1" />
                 <select 
                   className="text-sm font-black text-[var(--color-primary)] outline-none bg-transparent cursor-pointer min-w-[100px]" 
-                  value={dbPosFilter} 
-                  onChange={(e) => setDbPosFilter(e.target.value)}
+                  value={negPosFilter} 
+                  onChange={(e) => setNegPosFilter(e.target.value)}
                 >
                   <option value="전체">전체 직급</option>
                   {POSITION_SEQUENCE.map(p => <option key={p} value={p}>{p}</option>)}
@@ -1521,7 +1608,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
             </div>
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[var(--color-primary)] transition-colors" size={18} />
-              <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl w-64 text-sm font-medium shadow-sm outline-none" value={dbSearchTerm} onChange={(e) => setDbSearchTerm(e.target.value)} />
+              <input type="text" placeholder="사원 검색..." className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl w-64 text-sm font-medium shadow-sm outline-none" value={negSearchTerm} onChange={(e) => setNegSearchTerm(e.target.value)} />
             </div>
           </div>
 

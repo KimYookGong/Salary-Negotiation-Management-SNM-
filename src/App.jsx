@@ -78,6 +78,31 @@ function App() {
           }
         }
 
+        // [강화] 사원 번호가 존재하지만 연봉이 0인 경우, employee_history에서 최신 데이터를 가져와 프로필 업데이트
+        if (profileData.employee_id && (!profileData.current_salary || Number(profileData.current_salary) === 0)) {
+          const { data: latestHist } = await supabase
+            .from('employee_history')
+            .select('salary, position, performance_rating')
+            .eq('employee_id', profileData.employee_id)
+            .order('year', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (latestHist) {
+            const { data: updatedProfile } = await supabase
+              .from('profiles')
+              .update({
+                current_salary: latestHist.salary || 0,
+                position: latestHist.position || profileData.position,
+                performance_rating: latestHist.performance_rating || profileData.performance_rating
+              })
+              .eq('id', userId)
+              .select()
+              .single();
+            if (updatedProfile) profileData = updatedProfile;
+          }
+        }
+
         setProfile(profileData);
         const role = profileData.role || 'evaluatee';
         setUserRole(role);
