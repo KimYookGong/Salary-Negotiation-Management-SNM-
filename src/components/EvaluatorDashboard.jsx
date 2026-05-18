@@ -1354,9 +1354,9 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
 
                               {/* 7. 반응형 경계 감지 스마트 SVG 툴팁 */}
                               {hoveredDot && (() => {
-                                const isTooltipAbove = hoveredDot.yPixel >= 85;
+                                const isTooltipAbove = hoveredDot.yPixel >= 100;
                                 const tooltipY = isTooltipAbove ? hoveredDot.yPixel - 15 : hoveredDot.yPixel + 15;
-                                const tooltipRectY = isTooltipAbove ? -78 : 8;
+                                const tooltipRectY = isTooltipAbove ? -90 : 8;
                                 const pointerPoints = isTooltipAbove 
                                   ? "0,0 -5,-5 5,-5" 
                                   : "0,0 -5,5 5,5";
@@ -1365,23 +1365,23 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                   <g transform={`translate(${hoveredDot.xPixel}, ${tooltipY})`} className="pointer-events-none z-50">
                                     {/* 툴팁 어두운 배경 */}
                                     <rect 
-                                      x="-85" 
+                                      x="-95" 
                                       y={tooltipRectY} 
-                                      width="170" 
-                                      height="70" 
+                                      width="190" 
+                                      height="82" 
                                       rx="12" 
                                       fill="#1E293B" 
                                       opacity="0.95" 
                                     />
                                     {/* 툴팁 텍스트 정보 */}
-                                    <text x="0" y={tooltipRectY + 20} fill="white" fontSize="11" fontWeight="bold" textAnchor="middle">
+                                    <text x="0" y={tooltipRectY + 24} fill="white" fontSize="13" fontWeight="bold" textAnchor="middle">
                                       {hoveredDot.evaluatee_name} ({hoveredDot.performance_rating}등급)
                                     </text>
-                                    <text x="0" y={tooltipRectY + 38} fill="#94A3B8" fontSize="10" textAnchor="middle">
-                                      현재: {formatChartYLabel(hoveredDot.currentVal)}원
+                                    <text x="0" y={tooltipRectY + 45} fill="#94A3B8" fontSize="12" textAnchor="middle">
+                                      연봉: {formatChartYLabel(hoveredDot.currentVal)}원
                                     </text>
-                                    <text x="0" y={tooltipRectY + 54} fill="#A4D65E" fontSize="10" fontWeight="bold" textAnchor="middle">
-                                      요구 인상률: {hoveredDot.rateFormatted}%
+                                    <text x="0" y={tooltipRectY + 66} fill="#A4D65E" fontSize="12" fontWeight="bold" textAnchor="middle">
+                                      인상률: {hoveredDot.rateFormatted}%
                                     </text>
                                     {/* 말풍선 삼각형 꼬리 */}
                                     <polygon points={pointerPoints} fill="#1E293B" opacity="0.95" />
