@@ -341,3 +341,30 @@ ALTER TABLE market_benchmarks ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all access for risk_assessments" ON risk_assessments FOR ALL USING (true);
 CREATE POLICY "Allow all access for market_benchmarks" ON market_benchmarks FOR ALL USING (true);
+
+-- 12. 시스템 보안 설정 (app_settings) 테이블 생성
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- RLS 설정 활성화
+ALTER TABLE app_settings ENABLE ROW LEVEL SECURITY;
+
+-- 인증된 사용자만 SELECT 가능
+CREATE POLICY "Allow authenticated users to select app_settings"
+ON app_settings FOR SELECT
+TO authenticated
+USING (true);
+
+-- 오직 관리자(evaluator) 등급을 가진 사용자만 INSERT/UPDATE/DELETE 가능
+CREATE POLICY "Allow evaluator to mutate app_settings"
+ON app_settings FOR ALL
+TO authenticated
+USING (
+  EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE profiles.id = auth.uid() AND profiles.role = 'evaluator'
+  )
+);

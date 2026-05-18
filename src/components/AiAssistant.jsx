@@ -1,527 +1,673 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { 
-  Sparkles, 
-  Key, 
-  User, 
-  Send, 
-  TrendingUp, 
-  AlertTriangle, 
-  MessageSquare, 
-  CheckCircle, 
-  FileText, 
-  HelpCircle, 
-  Coins, 
-  BrainCircuit, 
+import {
+  Sparkles,
+  Send,
+  Key,
   Lock,
-  ChevronRight,
-  RefreshCw,
-  Eye,
-  EyeOff
+  DollarSign,
+  FileText,
+  AlertTriangle,
+  ShieldAlert,
+  Brain,
+  HelpCircle,
+  TrendingUp,
+  User,
+  Briefcase,
+  Download,
+  CheckCircle2,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// 금액 포맷터
-const formatCurrency = (value) => {
-  if (!value && value !== 0) return '-';
-  const num = Number(value);
-  return num.toLocaleString() + '원';
-};
-
-const AiAssistant = ({ profile, userRole, currentYear }) => {
-  // API Key 관련 상태
+export default function AiAssistant({ profile, userRole, currentYear }) {
+  // --- 상태 관리 ---
   const [apiKey, setApiKey] = useState('');
   const [showKeyInput, setShowKeyInput] = useState(false);
-  const [isKeyVisible, setIsKeyVisible] = useState(false);
-  
-  // 공통 상태
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(userRole === 'evaluator' ? 'recommend' : 'pr');
+
+  // AI 응답 상태
   const [aiResponse, setAiResponse] = useState('');
-  const [activeSubTab, setActiveSubTab] = useState(''); // evaluator: 'recommend', 'script', 'risk' / evaluatee: 'pr', 'objection', 'suggest'
-  
-  // 평가자(Evaluator) 측 상태
+
+  // 평가자(Evaluator) 전용 데이터 상태
   const [employees, setEmployees] = useState([]);
-  const [selectedEmpId, setSelectedEmpId] = useState('');
-  const [selectedEmpData, setSelectedEmpData] = useState(null);
-  
-  // 피평가자(Evaluatee) 측 상태
-  const [myHistory, setMyHistory] = useState([]);
-  const [myBenchmark, setMyBenchmark] = useState(null);
-  const [myJd, setMyJd] = useState('');
-  const [myReason, setMyReason] = useState('');
-  const [myHopeSalary, setMyHopeSalary] = useState('');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [selectedEmployeeData, setSelectedEmployeeData] = useState(null);
 
-  // 1. API 키 초기화
-  useEffect(() => {
-    const savedKey = localStorage.getItem('vite_gemini_api_key');
-    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (savedKey) {
-      setApiKey(savedKey);
-    } else if (envKey) {
-      setApiKey(envKey);
-    } else {
-      setShowKeyInput(true); // 키가 없으면 자동으로 입력란 표시
-    }
-  }, []);
+  // 피평가자(Evaluatee) 전용 데이터 상태
+  const [myContextData, setMyContextData] = useState(null);
 
-  // API 키 저장 핸들러
-  const handleSaveApiKey = (e) => {
-    e.preventDefault();
-    if (apiKey.trim()) {
-      localStorage.setItem('vite_gemini_api_key', apiKey.trim());
-      setShowKeyInput(false);
-      alert('API Key가 로컬에 안전하게 저장되었습니다.');
-    } else {
-      localStorage.removeItem('vite_gemini_api_key');
-      alert('API Key가 비워졌습니다. 환경변수 값이 있다면 사용됩니다.');
+  // --- 1. API 키 초기화 (Supabase DB app_settings 연계 - 로컬 스토리지 전면 격리) ---
+  const fetchApiKeyFromDb = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', 'gemini_api_key')
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data && data.value) {
+        setApiKey(data.value);
+      } else {
+        const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (envKey) {
+          setApiKey(envKey);
+        } else if (userRole === 'evaluator') {
+          setShowKeyInput(true); // 관리자인데 DB에 마스터 키가 없으면 자동으로 입력 모달 노출
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching API key from DB:', err);
+      // Fallback to env key
+      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (envKey) setApiKey(envKey);
     }
   };
 
-  // 2. 초기 데이터 로딩
+  useEffect(() => {
+    fetchApiKeyFromDb();
+  }, [userRole]);
+
+  // API 키 저장 핸들러 (DB app_settings UPSERT 연동)
+  const handleSaveApiKey = async (e) => {
+    e.preventDefault();
+    if (!apiKey.trim()) {
+      alert('API Key를 입력해 주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .upsert({
+          key: 'gemini_api_key',
+          value: apiKey.trim(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      setShowKeyInput(false);
+      alert('API Key가 시스템 보안 설정(DB)에 안전하게 저장되었습니다.');
+      fetchApiKeyFromDb();
+    } catch (err) {
+      console.error('Error saving API Key:', err);
+      alert('API Key 저장 중 오류가 발생했습니다: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- 2. 데이터 초기 쿼리 (역할별) ---
   useEffect(() => {
     if (userRole === 'evaluator') {
-      fetchEmployees();
-      setActiveSubTab('recommend');
+      fetchEmployeesList();
     } else {
-      fetchMyData();
-      setActiveSubTab('pr');
+      fetchMyContextData();
     }
-  }, [userRole, profile, currentYear]);
+  }, [userRole, selectedEmployeeId]);
 
-  // 평가자: 사원 목록 로드
-  const fetchEmployees = async () => {
+  // 평가자: 임직원 목록 조회
+  const fetchEmployeesList = async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, name, department, position')
         .eq('role', 'evaluatee')
-        .order('full_name');
-        
+        .order('name');
       if (error) throw error;
       setEmployees(data || []);
+
+      // 첫 번째 사원 자동 선택
+      if (data && data.length > 0 && !selectedEmployeeId) {
+        setSelectedEmployeeId(data[0].id);
+      }
     } catch (err) {
-      console.error('Error fetching employees:', err);
+      console.error('사원 목록 조회 오류:', err);
     }
   };
 
-  // 피평가자: 내 데이터(이력, 벤치마크, 기존협상안) 로드
-  const fetchMyData = async () => {
-    if (!profile) return;
+  // 평가자: 선택된 사원의 연계 맥락 정보 실시간 통합 쿼리
+  const fetchSelectedEmployeeData = async (employeeId) => {
+    if (!employeeId) return;
+    setLoading(true);
     try {
-      // 1) 고과/연봉 히스토리
-      if (profile.employee_id) {
-        const { data: histData } = await supabase
-          .from('employee_history')
+      // 1. 프로필
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', employeeId)
+        .single();
+
+      // 2. 5개년 고과/연봉 히스토리
+      const { data: historyData } = await supabase
+        .from('employee_history')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('year', { ascending: false });
+
+      // 3. 시장 벤치마크 (부서 + 직급 기반)
+      let benchmarkData = null;
+      if (profileData) {
+        const { data: bench } = await supabase
+          .from('market_benchmarks')
           .select('*')
-          .eq('employee_id', profile.employee_id)
-          .order('year', { ascending: false });
-        setMyHistory(histData || []);
+          .eq('department', profileData.department)
+          .eq('position', profileData.position)
+          .eq('year', currentYear)
+          .maybeSingle();
+        benchmarkData = bench;
       }
-      
-      // 2) 시장 벤치마크 데이터
-      const { data: benchData } = await supabase
+
+      // 4. 이탈 위험도
+      let riskData = null;
+      if (profileData) {
+        const { data: risk } = await supabase
+          .from('risk_assessments')
+          .select('*')
+          .eq('employee_name', profileData.name)
+          .maybeSingle();
+        riskData = risk;
+      }
+
+      // 5. 부서 잔여 예산 정보
+      let budgetData = null;
+      if (profileData) {
+        const { data: budget } = await supabase
+          .from('department_budgets')
+          .select('*')
+          .eq('department', profileData.department)
+          .eq('year', currentYear)
+          .maybeSingle();
+        budgetData = budget;
+      }
+
+      // 6. 현재 협상 상태
+      const { data: negotiationData } = await supabase
+        .from('negotiations')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('year', currentYear)
+        .maybeSingle();
+
+      setSelectedEmployeeData({
+        profile: profileData,
+        history: historyData || [],
+        benchmark: benchmarkData,
+        risk: riskData,
+        budget: budgetData,
+        negotiation: negotiationData
+      });
+    } catch (err) {
+      console.error('사원 다중 맥락 정보 통합 쿼리 오류:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (userRole === 'evaluator' && selectedEmployeeId) {
+      fetchSelectedEmployeeData(selectedEmployeeId);
+    }
+  }, [selectedEmployeeId]);
+
+  // 피평가자: 로그인한 본인의 맥락 정보 조회
+  const fetchMyContextData = async () => {
+    if (!profile) return;
+    setLoading(true);
+    try {
+      // 1. 과거 히스토리
+      const { data: historyData } = await supabase
+        .from('employee_history')
+        .select('*')
+        .eq('employee_id', profile.id)
+        .order('year', { ascending: false });
+
+      // 2. 본인의 시장 벤치마크
+      const { data: benchmarkData } = await supabase
         .from('market_benchmarks')
         .select('*')
         .eq('department', profile.department)
         .eq('position', profile.position)
         .eq('year', currentYear)
         .maybeSingle();
-      setMyBenchmark(benchData);
 
-      // 3) 현재 진행중인 연봉 협상 요구안
-      let query = supabase.from('negotiations').select('*').eq('year', currentYear);
-      if (profile.employee_id) {
-        query = query.or(`evaluatee_id.eq.${profile.id},employee_id.eq.${profile.employee_id}`);
-      } else {
-        query = query.eq('evaluatee_id', profile.id);
-      }
-      const { data: negoData } = await query.maybeSingle();
-      
-      if (negoData) {
-        setMyJd(negoData.jd || '');
-        setMyReason(negoData.reason || '');
-        setMyHopeSalary(negoData.evaluatee_proposal ? negoData.evaluatee_proposal.toString() : '');
-      }
-    } catch (err) {
-      console.error('Error fetching my data:', err);
-    }
-  };
-
-  // 평가자: 특정 사원 선택 시 맥락 데이터 쿼리
-  const handleSelectEmployee = async (empId) => {
-    setSelectedEmpId(empId);
-    if (!empId) {
-      setSelectedEmpData(null);
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const emp = employees.find(e => e.id === empId);
-      if (!emp) return;
-
-      // 1) 과거 이력 조회
-      let historyData = [];
-      if (emp.employee_id) {
-        const { data } = await supabase
-          .from('employee_history')
-          .select('*')
-          .eq('employee_id', emp.employee_id)
-          .order('year', { ascending: false });
-        historyData = data || [];
-      }
-
-      // 2) 이탈 위험군 데이터 조회
-      const { data: riskData } = await supabase
-        .from('risk_assessments')
+      // 3. 기작성한 협상안 정보 (성과요약 및 요구조건)
+      const { data: negotiationData } = await supabase
+        .from('negotiations')
         .select('*')
-        .eq('employee_name', emp.full_name)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // 3) 부서 예산 데이터 조회
-      const { data: deptBudget } = await supabase
-        .from('department_budgets')
-        .select('*')
-        .eq('department_name', emp.department)
+        .eq('employee_id', profile.id)
         .eq('year', currentYear)
         .maybeSingle();
 
-      // 4) 시장 벤치마크 데이터 조회
-      const { data: benchmarkData } = await supabase
-        .from('market_benchmarks')
-        .select('*')
-        .eq('department', emp.department)
-        .eq('position', emp.position)
-        .eq('year', currentYear)
-        .maybeSingle();
-
-      // 5) 현재 협상 진행 현황
-      let query = supabase.from('negotiations').select('*').eq('year', currentYear);
-      if (emp.employee_id) {
-        query = query.or(`evaluatee_id.eq.${emp.id},employee_id.eq.${emp.employee_id}`);
-      } else {
-        query = query.eq('evaluatee_id', emp.id);
-      }
-      const { data: negotiationData } = await query.maybeSingle();
-
-      setSelectedEmpData({
-        profile: emp,
-        history: historyData,
-        risk: riskData,
-        budget: deptBudget,
+      setMyContextData({
+        history: historyData || [],
         benchmark: benchmarkData,
         negotiation: negotiationData
       });
-      setAiResponse('');
     } catch (err) {
-      console.error('Error fetching employee context:', err);
-      alert('사원 정보 조회 중 오류가 발생했습니다.');
+      console.error('내 맥락 정보 조회 오류:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  // 3. Gemini API 호출 로직
+  // --- 3. Gemini 2.5 Flash API 통신 모듈 (Direct fetch) ---
   const callGemini = async (prompt) => {
     if (!apiKey) {
-      alert('AI 기능을 이용하려면 Gemini API Key 설정이 필요합니다. 상단의 API Key 설정 버튼을 이용해 등록해 주세요.');
-      setShowKeyInput(true);
+      if (userRole === 'evaluator') {
+        alert('AI 기능을 이용하려면 Gemini API Key 설정이 필요합니다. 상단의 API Key 설정 버튼을 이용해 등록해 주세요.');
+        setShowKeyInput(true);
+      } else {
+        alert('시스템 마스터 AI API Key가 설정되지 않았습니다. 관리자(평가자)에게 문의하여 AI 설정 등록을 요청해 주세요.');
+      }
       return;
     }
 
     setLoading(true);
     setAiResponse('');
-    
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: prompt
+                  }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.2, // 논리적 연산과 제안 논거 생성을 위해 정밀도 향상
+              maxOutputTokens: 2548
             }
-          ],
-          generationConfig: {
-            temperature: 0.3,
-            topP: 0.95,
-            maxOutputTokens: 2500
-          }
-        })
-      });
+          })
+        }
+      );
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error?.message || 'API 호출에 실패했습니다.');
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'API 호출 오류');
       }
 
       const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '답변을 생성할 수 없습니다.';
-      setAiResponse(text);
+      const outputText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+      if (!outputText) {
+        throw new Error('응답 형식 분석 실패');
+      }
+      setAiResponse(outputText);
     } catch (err) {
-      console.error('Gemini API Error:', err);
-      setAiResponse(`⚠️ **오류 발생**: ${err.message}\n\n입력하신 API Key가 올바른지 확인해 주시거나 잠시 후 다시 시도해 주세요.`);
+      console.error('Gemini API 통신 에러:', err);
+      setAiResponse(`❌ **AI 어시스턴트 통신 실패**\n\n이유: ${err.message}\n\n*해결 팁: 입력하신 API Key가 만료되었거나 올바르지 않은지 우측 상단 'API Key 설정'에서 다시 체크해 주시기 바랍니다.*`);
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. 평가자 프롬프트 생성기
-  const handleEvaluatorAiAction = (actionType) => {
-    if (!selectedEmpData) {
-      alert('먼저 사원을 선택해 주세요.');
-      return;
+  // --- 4. 프롬프트 생성기 (동적 빌드) ---
+  const triggerAiAnalysis = (type) => {
+    let prompt = '';
+
+    if (userRole === 'evaluator') {
+      if (!selectedEmployeeData || !selectedEmployeeData.profile) {
+        alert('분석할 대상 임직원을 선택해 주세요.');
+        return;
+      }
+
+      const emp = selectedEmployeeData.profile;
+      const historyStr = selectedEmployeeData.history.map(h =>
+        `- ${h.year}년: 고과 [${h.performance_rating}], 연봉 [${h.salary.toLocaleString()}원] (${h.position})`
+      ).join('\n');
+
+      const bench = selectedEmployeeData.benchmark;
+      const benchStr = bench ?
+        `- 시장 벤치마크 (25% 분위: ${bench.p25.toLocaleString()}원, 평균: ${bench.average.toLocaleString()}원, 75% 분위: ${bench.p75.toLocaleString()}원)`
+        : '- 시장 벤치마크 데이터가 시스템에 현재 등록되지 않았습니다.';
+
+      const risk = selectedEmployeeData.risk;
+      const riskStr = risk ?
+        `- 이탈 위험 등급: **[${risk.risk_level}]**, 사유: ${risk.reason}`
+        : '- 이탈 위험 평가 미대상 또는 안정군입니다.';
+
+      const budget = selectedEmployeeData.budget;
+      const budgetStr = budget ?
+        `- 소속 부서: ${budget.department} (총 예산: ${budget.total_budget.toLocaleString()}원, 소모 예산: ${budget.spent_budget.toLocaleString()}원, 잔여 예산: ${(budget.total_budget - budget.spent_budget).toLocaleString()}원)`
+        : '- 부서 예산 미등록 상태입니다.';
+
+      const neg = selectedEmployeeData.negotiation;
+      const negStr = neg ?
+        `- 사원 희망 연봉안: **${neg.proposed_salary ? neg.proposed_salary.toLocaleString() + '원' : '미정'}**\n- 사원 작성 성과 요약:\n"${neg.evaluatee_comment || '미작성'}"`
+        : '- 사원이 제출한 올해 연봉 협상 제안서가 아직 존재하지 않습니다.';
+
+      if (type === 'recommend') {
+        prompt = `
+당신은 연봉 협상 플랫폼 "SalarySync"의 최고 AI 인사 컨설턴트 및 수석 보상 전략가입니다.
+평가자(인사권자)가 선택한 특정 사원의 다중 데이터 컨텍스트를 바탕으로, 올해의 **[최적 추천 제안 연봉]**을 도출하고 정밀한 논거 리포트를 작성해 주세요.
+
+[사원 다중 정보 컨텍스트]
+- 이름: ${emp.name} (소속: ${emp.department} / 직급: ${emp.position})
+- 최근 5개년 고과 및 연봉 추이:
+${historyStr}
+- 소속 부서 예산 현황:
+${budgetStr}
+- 동종 업계 시장 벤치마크:
+${benchStr}
+- 핵심 인재 이탈 위험도:
+${riskStr}
+- 현재 협상 진행 현황 및 사원 주장:
+${negStr}
+
+[출력 요구 조건 (Markdown 형식으로 상세하게 작성)]
+1. **[최적 AI 추천 제안 연봉]**: 부서 잔여 예산 적합도, 시장 벤치마크 포지셔닝(p25~p75), 과거 고과 추이를 복합 연산하여 구체적인 원화(KRW) 단위 금액과 인상률(%)을 굵은 글씨로 상단에 명시해 주세요. (잔여 예산 한도를 초과하지 않도록 보수성과 리텐션을 조율하십시오.)
+2. **[다차원 근거 분석]**:
+   - 고과 기여도 대비 보상 적합성 분석
+   - 시장 시장가치 대비 포지셔닝 타당성
+   - 이탈 위험 방어를 위한 재무적 영향성
+3. **[대안 시나리오 제언]**:
+   - 부서 예산 제약이 극심한 경우 차선책으로 제시할 수 있는 비재무적 특수 보상 옵션 (특별 휴가, 교육 기회 제공, 유연근무 우선권 등)
+   - 최상의 시나리오와 최악의 절충안 제안.
+
+모든 숫자와 원화 포맷은 100% 명확히 한국 정서에 맞게 구체적으로 표현하고 전문가적인 톤으로 성실하게 적어주세요.
+        `;
+      } else if (type === 'script') {
+        prompt = `
+당신은 베테랑 인사 부서장 및 비즈니스 협상 코치입니다.
+평가자(인사권자)가 사원 **${emp.name}**과의 1:1 대면 연봉 협상 면담에 즉시 활용할 수 있는 실전용 **[1:1 설득 롤플레잉 스크립트]**를 제작해 주세요.
+
+[사원 정보 컨텍스트]
+- 사원명: ${emp.name} (직급: ${emp.position})
+- 올해 고과 및 과거 히스토리:
+${historyStr}
+- 부서 예산 상황 및 시장 벤치마크:
+${budgetStr}
+${benchStr}
+- 사원의 요구 요약:
+${negStr}
+
+[스크립트 단계별 구성 조건 (Markdown 형식)]
+다음 5단계의 실제 대화 흐름을 "인사권자(말투: 정중함, 단호하면서도 따뜻함)"와 "사원(말투: 조심스러우면서도 자신의 성과를 관철하려 함)"의 티키타카 대화 형식으로 실감 나게 적어주세요.
+1. **오프닝 (Opening)**: 사원의 노고에 깊은 감사 표명 및 면담의 따뜻한 분위기 유도.
+2. **성과 피드백 (Feedback)**: 올해 사원이 올린 실적과 고과 등급에 대한 합당한 객관적 평가 분석 제시.
+3. **제안액 제시 및 근거 공개 (Negotiation)**: 회사가 책정한 인상안을 조심스럽지만 명확하게 제시하고, 부서 예산 한계 및 시장 벤치마크 타당성에 기반하여 합리적임을 설명하는 대화.
+4. **반론/우려 수용 및 쿠션 격려 (Mitigation)**: 사원이 예산이나 인상폭에 실망감을 드러낼 때, 이를 경청하고 감정적으로 수용하면서도 리텐션(경력 기회 확대, 미래 보장)을 자극하는 모범 쿠션어 스크립트.
+5. **클로징 (Closing)**: 동기부여를 심어주며 기분 좋게 도장을 찍도록 유도하는 약속 맺기.
+        `;
+      } else if (type === 'retention') {
+        prompt = `
+당신은 글로벌 헤드헌팅 펌 출신의 인재 리텐션(Retention) 전략 전문가입니다.
+인재 이탈 위험 정보가 감지된 사원 **${emp.name}**을 조직에 잔류시키기 위한 종합 **[인재 잔류 및 보상 액션플랜 리포트]**를 수립해 주세요.
+
+[사원 맥락 정보]
+- 사원명: ${emp.name} (직급: ${emp.position})
+- 이탈 위험 정밀 진단:
+${riskStr}
+- 연봉 및 시장 가치:
+${historyStr}
+${benchStr}
+
+[리포트 포함 조건 (Markdown 형식)]
+1. **[이탈 동기 정밀 진단]**: 등록된 리스크 사유를 심리학적, 커리어적 관점에서 분석하여 이 사원이 가장 결핍을 느끼는 근본 요소를 진단해 주세요.
+2. **[맞춤형 잔류 처방전 (3 Core Cards)]**:
+   - **재무적 특별 카드**: 일시적 인센티브, 내년도 보장 인상율, 스톡옵션 등 적용 가능한 재무 처방.
+   - **커리어 및 직무 카드**: 사원이 원하는 R&R 조정, 상위 포지션 조기 배정 가능성, 특별 직무 교육 예산 배정.
+   - **조직 문화 및 정서적 케어**: 멘토링 매칭, 리더십과의 1:1 대화 정례화, 심리적 안정감을 심어주는 면담 약속.
+3. **[향후 6개월 밀착 모니터링 가이드라인]**: 매월 체크해야 할 리스크 시그널과 예방적 피드백 주기 설계.
+        `;
+      }
+    } else {
+      // 피평가자 (Evaluatee) 모드 프롬프트
+      if (!profile) return;
+
+      const myHistoryStr = myContextData?.history.map(h =>
+        `- ${h.year}년: 고과 [${h.performance_rating}], 연봉 [${h.salary.toLocaleString()}원] (${h.position})`
+      ).join('\n') || '- 이력 없음';
+
+      const myBench = myContextData?.benchmark;
+      const myBenchStr = myBench ?
+        `- 부서/직급 시장 벤치마크 (25% 분위: ${myBench.p25.toLocaleString()}원, 평균: ${myBench.average.toLocaleString()}원, 75% 분위: ${myBench.p75.toLocaleString()}원)`
+        : '- 시장 벤치마크 데이터가 등록되지 않았습니다.';
+
+      const myNeg = myContextData?.negotiation;
+      const myNegStr = myNeg ?
+        `- 내가 제안한 희망 연봉: **${myNeg.proposed_salary ? myNeg.proposed_salary.toLocaleString() + '원' : '미정'}**\n- 내가 기재한 성과 요약:\n"${myNeg.evaluatee_comment || '미작성'}"`
+        : '- 아직 올해 협상 제안서를 작성 및 제출하지 않았습니다.';
+
+      if (type === 'pr') {
+        prompt = `
+당신은 대기업 임원협상 및 직무 역량 PR 전문 라이터입니다.
+피평가자(사원) 본인의 성과 추이와 작성 노트를 토대로, 올해 협상 테이블에서 인사권자의 마음을 열 수 있는 **[최고급 STAR 기반 자기 PR 제안서 초안]**을 수려하게 빌드해 주세요.
+
+[나의 정보 컨텍스트]
+- 내 이름: ${profile.name} (소속 부서: ${profile.department} / 직급: ${profile.position})
+- 나의 연봉/고과 히스토리:
+${myHistoryStr}
+- 나의 기작성 성과 요약 및 희망 요구안:
+${myNegStr}
+
+[제안서 빌드 구조 (Markdown 형식)]
+1. **[직무 역량 에센스 요약 (Executive Summary)]**: 내가 올해 회사에 기여한 핵심 기여 핵심지표(KPI)를 한 눈에 들어오도록 3줄 요약.
+2. **[STAR 기법 기반의 성과 정밀 서술]**:
+   - **S (Situation)**: 올해 부서가 직면했던 대내외적 과제와 상황.
+   - **T (Task)**: 그 안에서 나에게 주어졌던 구체적인 미션과 과업.
+   - **A (Action)**: 내가 리더십을 발휘하여 주도적으로 실행한 전문적 대책 및 문제 해결 과정 (수치 중심).
+   - **R (Result)**: 나의 액션으로 인해 발생한 구체적인 비즈니스 성과와 가치 창출 (전년비 % 상승, 비용 절감액 등 정량화).
+3. **[미래 성장 기여도 및 로드맵]**: 인상된 연봉을 승인받았을 때, 내년에 회사에 돌려줄 200%의 가치 창출 계획 및 R&R 확장 약속.
+        `;
+      } else if (type === 'objection') {
+        prompt = `
+당신은 대한민국 최고의 비즈니스 협상 아카데미 원장입니다.
+인사권자(평가자)가 연봉 협상 테이블에서 단골로 꺼내는 거절/삭감 핑계에 대해, 사원이 기분을 상하게 하지 않으면서 자신의 정당한 가치를 입증하고 논리적으로 역제안할 수 있는 **[인사권자 3대 단골 거절 반론 가이드북]**을 집필해 주세요.
+
+[나의 맥락 상황]
+- 사원: ${profile.name} (${profile.position})
+- 올해 나의 성과 요약 및 시장 벤치마크:
+${myNegStr}
+${myBenchStr}
+
+[가이드북 포함 구조 (Markdown 형식)]
+다음 3대 거절 상황 각각에 대해 ① **인사권자의 핑계 멘트**, ② **대응 핵심 로직(Do's & Don'ts)**, ③ **실전 즉시 활용 가능한 모범 말하기 스크립트**를 구체적 구어체로 제공해 주세요.
+- **상황 1: [회사/부서 예산 동결로 인해 인상이 곤란하다는 핑계]** (대처법: 비재무적 보상 결합안 및 향후 성과 연동 인센티브 약속 역제안 등)
+- **상황 2: [내부 동료들과의 형평성 및 회사 연봉 밴드 테이블 제한 핑계]** (대처법: 시장 벤치마크 데이터 인용 및 내 직급 이상의 R&R 소화 증명을 통한 밴드 예외 적용 근거 대화법)
+- **상황 3: [올해 성과는 좋으나 요구한 인상폭이 평균 대비 너무 과하다는 핑계]** (대처법: 기여 성과의 정량화 가치 대비 보상 비중 계산법 및 협의 양보선 제시 조율 방법)
+        `;
+      } else if (type === 'simulate') {
+        prompt = `
+당신은 정밀 보상 컨설턴트 및 통계 데이터 분석가입니다.
+등록된 시장 벤치마크 지표와 사원의 고과 히스토리를 대조하여, 타결 확률이 가장 높은 **[올해 적정 희망 연봉 가이드라인 시뮬레이션]**을 가동해 주세요.
+
+[나의 지표 컨텍스트]
+- 내 직무 및 직급: ${profile.department} / ${profile.position}
+- 시장 벤치마크 분위수 현황:
+${myBenchStr}
+- 나의 고과 이력 및 현재 연봉:
+${myHistoryStr}
+- 나의 요구 희망안:
+${myNegStr}
+
+[시뮬레이션 결과 리포트 구조 (Markdown 형식)]
+1. **[올해 나의 시장 가치 백분위(Percentile) 진단]**: 벤치마크 데이터 대비 현재 내 연봉이 시장의 하위, 중위, 상위 어디에 포지셔닝되어 있는지 정밀 계산하여 피드백해 주세요.
+2. **[AI 추천 3대 협상 Target Line 제안]**:
+   - **A. 공세적 도전선 (Max Target)**: 뛰어난 고과와 높은 시장가치를 입증할 때 지향할 수 있는 최대 타겟 금액 (인상률 포함).
+   - **B. 합리적 타결선 (Sweet Spot)**: 인사권자가 예산 한도 내에서 현실적으로 고개를 끄덕일 가능성이 가장 높은 최적의 합의 금액.
+   - **C. 마지노 방어선 (Min Target)**: 이직이나 커리어의 불만을 방지하기 위해 최소한으로 방어해야 할 최소 인상선.
+3. **[구체적인 목표선별 연계 협상 포지셔닝 전략 가이드]**
+        `;
+      }
     }
 
-    const { profile: empProfile, history: empHistory, risk, budget, benchmark, negotiation } = selectedEmpData;
-    
-    const contextText = `
-[대상 사원 정보]
-- 성명: ${empProfile.full_name}
-- 부서: ${empProfile.department}
-- 현재 직급: ${empProfile.position}
-- 현재 연봉: ${formatCurrency(empProfile.current_salary)}
-- 올해 고과 등급: ${empProfile.performance_rating || '미정'}
-- 입사일: ${empProfile.hire_date || '알수없음'}
-
-[과거 협상 및 고과 이력]
-${empHistory.length > 0 ? empHistory.map(h => `- ${h.year}년: 직급 ${h.position}, 연봉 ${formatCurrency(h.salary)}, 등급 ${h.performance_rating}`).join('\n') : '이력 없음'}
-
-[시장 벤치마크 (동일 부서/직급)]
-- 최소 연봉: ${benchmark ? formatCurrency(benchmark.min_salary) : '정보 없음'}
-- 평균 연봉: ${benchmark ? formatCurrency(benchmark.avg_salary) : '정보 없음'}
-- 최대 연봉: ${benchmark ? formatCurrency(benchmark.max_salary) : '정보 없음'}
-
-[부서 예산 현황 (${currentYear}년)]
-- 부서 총 연봉 인상 예산: ${budget ? formatCurrency(budget.total_budget) : '정보 없음'}
-- 현재까지 기사용 예산: ${budget ? formatCurrency(budget.used_budget) : '정보 없음'}
-- 잔여 예산: ${budget ? formatCurrency(budget.total_budget - budget.used_budget) : '정보 없음'}
-
-[이탈 위험 정보]
-${risk ? `- 위험도 등급: ${risk.risk_level} (사유: ${risk.reason})` : '검진 결과 특이사항 없음 (이탈 위험 낮음)'}
-
-[사원의 현재 연봉 협상 요구안]
-- 희망 인상 연봉: ${negotiation?.evaluatee_proposal ? formatCurrency(negotiation.evaluatee_proposal) : '미제출'}
-- 승진 요청 여부: ${negotiation?.promotion_request ? '요청함' : '요청안함'}
-- 직무 기술서 (JD): ${negotiation?.jd || '미작성'}
-- 성과 및 기여 요약: ${negotiation?.reason || '미작성'}
-`;
-
-    let systemPrompt = '';
-    
-    if (actionType === 'recommend') {
-      systemPrompt = `
-당신은 대한민국 최고의 인사/보상 컨설턴트 및 HR 전문가입니다.
-주어진 대상 사원의 데이터(성과 등급, 과거 이력, 시장 벤치마크, 부서 잔여 예산, 이탈 위험 등)를 입체적으로 분석하여,
-올해 연도(${currentYear}년)에 가장 타당한 **"인상 제안액(원화)"**과 **"추천 이유"**를 구체적 수치에 근거하여 작성해 주세요.
-
-작성 가이드라인:
-1. **분석 요약**: 사원의 등급과 이력, 요구안을 한눈에 볼 수 있도록 핵심 강점과 리스크를 요약해 주세요.
-2. **추천 제안**: 구체적인 원화 단위 추천 연봉과 인상률(%), 그리고 인상액을 명확히 제시하세요. (예산 상태 및 벤치마크 상의 백분율 위치를 반드시 고려)
-3. **상세 제안 근거**: 왜 이 금액이어야 하는지를 고과 등급, 시장 가치(벤치마크), 부서 예산의 제약 사항, 이탈 위험 요소를 조화롭게 결합해 설득력 있게 제시하세요.
-4. **대안 시나리오**: 만약 예산 한계로 타결이 어려울 경우 제공할 수 있는 비재무적 보상 방안(교육 지원, 유연 근무 등)을 가볍게 제언해 주세요.
-
-모든 내용은 정중하고 격식 있는 비즈니스 톤의 한국어로 마크다운 스타일을 적용해 가독성 높게 출력해 주세요.
-`;
-    } else if (actionType === 'script') {
-      systemPrompt = `
-당신은 탁월한 커뮤니케이션 능력을 지닌 최고의 HR 파트너이자 리더십 코치입니다.
-주어진 사원의 성과 등급, 희망안, 그리고 회사 추천안(임의 분석 필요)을 바탕으로, 연봉 면담 시 평가자가 대상 사원을 따뜻하게 격려하면서도 회사의 제안을 합리적으로 납득시키고 동기부여를 이끌어낼 수 있는 **"실제 면담 스크립트"**를 만들어 주세요.
-
-작성 가이드라인:
-1. **면담 전략 핵심 팁**: 이 사원의 성향과 평가 등급, 리스크를 감안했을 때 면담 시 어떤 태도와 전략을 취해야 하는지 3대 핵심 포인트를 먼저 짚어주세요.
-2. **단계별 상세 스크립트 (실제 대화 대사 형태)**:
-   - **Step 1: 면담 오프닝 & 공감대 형성 (1~2분)** - 따뜻한 인사와 올해의 노고에 대한 감사 표현.
-   - **Step 2: 성과 피드백 & 긍정 평가 전달 (2~3분)** - 사원의 JD와 성과 요약을 바탕으로 구체적인 기여 부문 칭찬.
-   - **Step 3: 회사의 제안 연봉 오픈 및 설명 (3~4분)** - 회사 안을 제시하며 성과 등급 기준과 시장 위치(벤치마크)를 연계해 객관적으로 타당함을 설득하는 정중한 멘트.
-   - **Step 4: 사원의 반응별 모범 대처법 및 스크립트**
-     * 만약 사원이 실망하거나 희망연봉과의 갭에 반발할 때 활용할 수 있는 쿠션어와 대안(성장 가능성 어필 등) 제시 멘트.
-   - **Step 5: 마무리 & 동기 부여 클로징 (1~2분)** - 다음 연도 성장을 기원하고 격려하는 품격 있는 끝인사.
-
-실제 면담에서 바로 소리 내어 읽어도 자연스럽도록 구어체의 품위 있는 비즈니스 대화 톤으로 작성해 주세요. (마크다운 적용)
-`;
-    } else if (actionType === 'risk') {
-      systemPrompt = `
-당신은 사내 인재 유출을 미연에 방지하는 핵심 리텐션(Retention) 전문가입니다.
-주어진 사원의 이탈 위험 진단 정보(risk_assessments 기반)와 연봉 요구안, 그리고 벤치마크 데이터를 정밀 분석하여, 연봉 협상에서 이 사원의 불만을 해소하고 회사에 로열티를 가지고 롱런할 수 있도록 돕는 **"밀착 리텐션 액션 플랜"**을 설계해 주세요.
-
-작성 가이드라인:
-1. **이탈 위험 정밀 진단**: 사원의 고과 등급과 벤치마크 대비 현재 처우의 불만족 가능성, 그리고 보고서상의 이탈 사유를 종합하여 이탈 확률(상/중/하)과 주요 불만 요소를 구조적으로 진단해 주세요.
-2. **협상 테이블 대응 카드**: 이번 연봉 협상 시 이 사원의 로열티를 회복하기 위해 협상가가 제시할 수 있는 카드를 전략적으로 제안해 주세요.
-   - *재무적 카드*: 연봉 보정 범위, 특별 성과급 또는 내년도 우선 보상 약정 등.
-   - *커리어 카드*: 승진 기회 가속화, 핵심 프로젝트 리딩 기회, 희망 부서 직무 재배치 등.
-   - *환경적 카드*: 유연 근무 확대, 복지 포인트 추가 등.
-3. **사후 밀착 관리 프로세스**: 협상이 타결된 후에도 마음을 열고 몰입할 수 있도록 향후 6개월간 팀장이나 인사팀이 취해야 할 단계적 모니터링 및 주기적 1:1 면담 가이드를 작성해 주세요.
-
-신뢰할 수 있고 즉각 실천 가능한 실무 매뉴얼 스타일로, 격조 있는 한국어 마크다운으로 출력해 주세요.
-`;
-    }
-
-    callGemini(`${systemPrompt}\n\n[제공된 데이터 컨텍스트]\n${contextText}`);
+    callGemini(prompt);
   };
 
-  // 5. 피평가자 프롬프트 생성기
-  const handleEvaluateeAiAction = (actionType) => {
-    if (!profile) return;
+  // --- 5. 마크다운 파서 및 예쁜 뱃지 스타일 렌더러 ---
+  const parseStrongText = (text) => {
+    if (!text) return '';
 
-    const contextText = `
-[나의 기본 정보]
-- 성명: ${profile.full_name}
-- 부서: ${profile.department}
-- 직급: ${profile.position}
-- 현재 연봉: ${formatCurrency(profile.current_salary)}
-- 올해 획득 등급: ${profile.performance_rating || 'B (기본)'}
+    // **텍스트** 패턴을 감지하여 고급스러운 뱃지 스타일의 스팬으로 변경하는 헬퍼
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        const cleanText = part.slice(2, -2);
 
-[나의 과거 연봉 및 등급 이력]
-${myHistory.length > 0 ? myHistory.map(h => `- ${h.year}년: 직급 ${h.position}, 연봉 ${formatCurrency(h.salary)}, 등급 ${h.performance_rating}`).join('\n') : '이력 없음'}
+        // 원화 표시(원)나 퍼센트(%)가 들어가면 강조 뱃지 스타일로 변형
+        if (cleanText.includes('원') || cleanText.includes('%') || cleanText.includes('추천') || cleanText.includes('선')) {
+          return (
+            <span key={index} className="inline-block px-2.5 py-0.5 mx-1 font-black text-sm bg-gradient-to-r from-[var(--color-accent-1)] to-[var(--color-accent-2)] text-white rounded-lg shadow-sm border border-white/20">
+              {cleanText}
+            </span>
+          );
+        }
+        return <strong key={index} className="font-extrabold text-[var(--color-accent-1)]">{cleanText}</strong>;
+      }
+      return part;
+    });
+  };
 
-[시장 벤치마크 (나와 동일한 부서/직급의 시장 데이터)]
-- 최소 연봉: ${myBenchmark ? formatCurrency(myBenchmark.min_salary) : '정보 없음'}
-- 평균 연봉: ${myBenchmark ? formatCurrency(myBenchmark.avg_salary) : '정보 없음'}
-- 최대 연봉: ${myBenchmark ? formatCurrency(myBenchmark.max_salary) : '정보 없음'}
+  // 문단을 예쁘게 나누어 마크다운 리포트 카드 형태로 파싱
+  const renderResponseBlocks = () => {
+    if (!aiResponse) return null;
 
-[내가 작성한 현재의 희망 요구안]
-- 희망 희망연봉: ${myHopeSalary ? formatCurrency(myHopeSalary) : '아직 미입력'}
-- 직무 기술서 (JD): ${myJd || '아직 미입력'}
-- 성과 및 제안 사유: ${myReason || '아직 미입력'}
-`;
+    const lines = aiResponse.split('\n');
+    return (
+      <div className="space-y-4 text-white/90">
+        {lines.map((line, index) => {
+          const trimmed = line.trim();
 
-    let systemPrompt = '';
-    
-    if (actionType === 'pr') {
-      systemPrompt = `
-당신은 직원의 재능과 노고를 최고의 비즈니스 언어로 다듬어주는 탁월한 커리어 코치이자 PR 라이터입니다.
-주어진 본인의 프로필, 과거 고과 등급, 그리고 작성 중이거나 작성한 '직무 기술(JD)'과 '성과 및 제안 사유'를 정밀 가공하여, 인사권자(평가자)가 보았을 때 깊은 인상을 받고 요구 연봉의 타당성을 100% 수긍할 수 있는 **"최고급 연봉 인상 제안서(자기 PR서) 초안"**을 작성해 주세요.
+          if (!trimmed) return <div key={index} className="h-2" />;
 
-작성 가이드라인:
-1. **헤드라인**: 본인의 가치를 명확히 관통하는 세련된 한 줄 슬로건을 뽑아주세요.
-2. **핵심 기여 및 성과 요약 (수치 중심)**: 입력받은 성과 텍스트를 논리적인 구조(STAR 기법: Situation, Task, Action, Result)로 재배치하여, 정량적 지표와 정성적 기여도가 눈에 띄게 문장화해 주세요. (구체적인 지표가 부족하다면, 임시 수치 [X%] 등으로 가이드라인을 주어 채워 넣을 수 있게 해 주세요)
-3. **희망 연봉의 합리성 제시**: 획득한 등급의 의미와 시장 벤치마크 데이터를 근거로 하여 왜 내가 제안한 희망 연봉이 회사 입장에서도 '합리적인 인재 투자'가 되는지 조리 있게 서술해 주세요.
-4. **미래 기여 약속**: 단순히 돈을 더 달라는 요구에 그치지 않고, 인상된 연봉에 걸맞게 내년도에 부서와 회사에 어떻게 기여할 것인지 적극적인 R&R 및 포부를 작성해 주세요.
+          // 대제목 H1/H2
+          if (trimmed.startsWith('###')) {
+            return (
+              <h3 key={index} className="text-lg font-black text-white mt-6 mb-3 flex items-center gap-2 border-b border-white/10 pb-2">
+                <Brain size={18} className="text-[var(--color-accent-1)]" />
+                {parseStrongText(trimmed.replace('###', '').trim())}
+              </h3>
+            );
+          }
+          if (trimmed.startsWith('##')) {
+            return (
+              <h2 key={index} className="text-xl font-black text-white mt-8 mb-4 bg-white/5 p-3 rounded-xl border border-white/10 flex items-center gap-2">
+                <Sparkles size={20} className="text-[var(--color-accent-2)]" />
+                {parseStrongText(trimmed.replace('##', '').trim())}
+              </h2>
+            );
+          }
 
-회사를 존중하면서도 자신의 프로페셔널한 자존감을 잃지 않는 당당하고 세련된 한국어 비즈니스 톤으로 마크다운 스타일을 적용해 작성해 주세요.
-`;
-    } else if (actionType === 'objection') {
-      systemPrompt = `
-당신은 평화적이면서도 실리를 챙기는 최고의 협상 테이블 중재자입니다.
-연봉 면담 시 인사권자가 전형적으로 던지는 거절 및 연봉 삭감 유도 멘트에 대해, 직원이 감정적으로 위축되지 않고 자신의 페이스를 유지하며 모범적으로 방어 및 역제안을 할 수 있는 **"인사권자 반론 대비 대화집"**을 제공해 주세요.
+          // 리스트 항목
+          if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
+            return (
+              <ul key={index} className="list-disc pl-6 space-y-1.5">
+                <li className="leading-relaxed text-sm">
+                  {parseStrongText(trimmed.substring(1).trim())}
+                </li>
+              </ul>
+            );
+          }
 
-특히 인사권자의 3대 단골 거절 멘트에 맞춤화된 방어 전략을 작성해 주세요:
-1. **거절 시나리오 1: "올해 회사 및 부서 전체 예산이 동결 수준이라 더 올려주기가 곤란합니다."**
-   - *대응 전략*: 예산 부족 프레임을 깨고 개별 기여도로 유도하는 법.
-   - *실제 말하기 스크립트*: 정중한 공감 후 핵심 역량 어필 멘트.
-2. **거절 시나리오 2: "동료 직원들과의 형평성(연봉 밴드)을 고려했을 때 급격한 인상은 내부 반발을 부릅니다."**
-   - *대응 전략*: 형평성 논리를 존중하면서 우수 성과자 특별 보상 트랙을 제안하는 법.
-   - *실제 말하기 스크립트*: 설득 멘트.
-3. **거절 시나리오 3: "제시한 희망 연봉은 시장 평균(또는 등급 표준) 대비 다소 높은 편입니다."**
-   - *대응 전략*: 시장 벤치마크 및 본인이 획득한 고등급(S, A)의 희소성을 바탕으로 역설하는 법.
-   - *실제 말하기 스크립트*: 설득 멘트.
+          // 번호 매기기 리스트
+          if (/^\d+\./.test(trimmed)) {
+            return (
+              <div key={index} className="pl-2 py-1 flex gap-2 items-start text-sm leading-relaxed">
+                <span className="font-black text-[var(--color-accent-2)] min-w-[20px]">{trimmed.match(/^\d+\./)[0]}</span>
+                <p className="flex-1">{parseStrongText(trimmed.replace(/^\d+\./, '').trim())}</p>
+              </div>
+            );
+          }
 
-각 상황마다 **'인사권자의 숨은 의도 분석 -> 협상 꿀팁 -> 추천 쿠션어 -> 한 줄 핵심 대응 멘트 -> 풍부한 예시 대화록'** 순서로 구체적으로 작성해 주어, 실무에서 든든한 무기로 쓸 수 있도록 품위 있는 한국어 마크다운으로 가독성 높게 제공해 주세요.
-`;
-    } else if (actionType === 'suggest') {
-      systemPrompt = `
-당신은 데이터 분석에 기반하여 객관적인 몸값을 산정해 주는 최고의 HR 보상 분석가(Compensation Analyst)입니다.
-본인의 현재 연봉, 올해 고과 등급, 과거 고과 이력, 그리고 시장 벤치마크 데이터를 종합적으로 비교·시뮬레이션하여, 이번 연봉 협상에서 목표로 삼아야 할 **"적정 희망 연봉 범위"**와 **"협상 포지셔닝 전략"**을 분석해 주세요.
-
-작성 가이드라인:
-1. **시장 포지션 진단**: 현재 나의 연봉이 시장 벤치마크(최소~최대)에서 어느 퍼센타일(하위 %, 평균 수준, 상위 %)에 속하는지 객관적으로 알려주고, 올해 획득한 등급 대비 적당한 위치인지를 엄정히 평가해 주세요.
-2. **추천 인상 타겟 구간 제안**:
-   - *최소 방어선 (Min Target)*: 물가 상승률과 기본 등급 인상을 고려한 최소 수용 금액 및 인상률.
-   - *현실적 적정선 (Sweet Spot)*: 등급 성과와 벤치마크 평균을 조화시킨 가장 추천하는 협상 타결 목표 금액.
-   - *최대 도전선 (Max Target)*: 뛰어난 성과 기여와 승진 요청 등을 가미하여 최대 어필해 볼 수 있는 적극적 공세 금액.
-3. **전략적 포지셔닝 제언**: 면담 테이블에서 이 타겟들을 언제, 어떻게 오픈해야 하는지(오프닝 제안 기법 등)와 비재무적 조건(휴가, 성과급 조건 등)을 패키징하는 전략을 기술해 주세요.
-
-실제 데이터 수치(원화)를 적극 활용하여 신뢰도를 배가시키고, 격조 높고 깔끔한 한국어 마크다운 양식으로 보기 쉽게 정리해 주세요.
-`;
-    }
-
-    callGemini(`${systemPrompt}\n\n[제공된 데이터 컨텍스트]\n${contextText}`);
+          // 일반 단락
+          return (
+            <p key={index} className="leading-relaxed text-sm text-white/80 my-2">
+              {parseStrongText(trimmed)}
+            </p>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
-      {/* 1. Header Banner with Key Management */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-[var(--color-primary)] to-[#014421] rounded-3xl p-8 text-white shadow-xl shadow-primary/20">
-        <div className="absolute top-[-50px] right-[-50px] w-48 h-48 rounded-full bg-white/5 blur-2xl" />
-        <div className="absolute bottom-[-50px] left-[-50px] w-64 h-64 rounded-full bg-[var(--color-accent-1)]/10 blur-3xl" />
-        
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-[var(--color-accent-1)]/20 rounded-xl">
-                <Sparkles size={24} className="text-[var(--color-accent-1)] animate-pulse" />
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest text-[var(--color-accent-1)]">AI Support Panel</span>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* 1. Header Banner */}
+      <div className="relative rounded-3xl p-8 overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-white/10 shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-accent-1)]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-[var(--color-accent-2)]/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-gradient-to-tr from-[var(--color-accent-1)] to-[var(--color-accent-2)] rounded-2xl shadow-lg shadow-indigo-500/20 text-white animate-pulse">
+              <Sparkles size={32} />
             </div>
-            <h1 className="text-3xl font-black tracking-tight">SalarySync AI 어시스턴트</h1>
-            <p className="text-white/80 text-sm font-medium">
-              {userRole === 'evaluator' 
-                ? '임직원의 성과와 예산, 시장 가치를 정밀 종합 분석하여 최적의 연봉 제안과 성공적인 협상 시나리오를 추천합니다.' 
-                : '시장 데이터와 자신의 기여도를 입체적으로 연계하여, 나만의 프리미엄 제안서 작성과 면담 거절 반론을 완벽 대비합니다.'}
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 bg-white/10 text-white/80 text-xs font-black rounded-full uppercase tracking-wider">
+                  {userRole === 'evaluator' ? 'Evaluator Expert' : 'Evaluatee PR Master'}
+                </span>
+                <span className="text-white/40 text-xs font-bold">|</span>
+                <span className="text-white/60 text-xs font-bold">{currentYear}년 연도 협상 대응</span>
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">
+                AI 협상 전략 어시스턴트
+              </h1>
+            </div>
           </div>
-          
-          <div>
-            <button
-              onClick={() => setShowKeyInput(!showKeyInput)}
-              className="flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-sm font-black transition-all active:scale-95 shadow-inner"
-            >
-              <Key size={18} className="text-[var(--color-accent-1)]" />
-              <span>API Key 설정</span>
-            </button>
-          </div>
+
+          {/* API Key 설정 버튼 (오직 관리자/평가자 권한 세션에만 노출) */}
+          {userRole === 'evaluator' && (
+            <div>
+              <button
+                onClick={() => setShowKeyInput(!showKeyInput)}
+                className="flex items-center gap-2 px-5 py-3 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl text-sm font-black transition-all active:scale-95 shadow-inner"
+              >
+                <Key size={18} className="text-[var(--color-accent-1)]" />
+                <span>API Key 설정</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* API Key Input Form */}
+        {/* API Key 입력 폼 */}
         <AnimatePresence>
           {showKeyInput && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="relative mt-6 pt-6 border-t border-white/10 z-10"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mt-6 overflow-hidden"
             >
               <form onSubmit={handleSaveApiKey} className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4 max-w-xl">
                 <div className="flex items-center gap-2 text-xs font-black text-[var(--color-accent-1)] uppercase tracking-wider">
                   <Lock size={14} />
-                  <span>Gemini API Key 등록 (Client-Side Safe)</span>
+                  <span>Gemini API Key 시스템 설정 (DB RLS 암호화)</span>
                 </div>
                 <p className="text-white/60 text-xs leading-relaxed">
-                  입력하신 API Key는 서버로 전송되지 않으며 오직 사용자의 브라우저 로컬 스토리지에만 보관되어 안전합니다.
-                  Gemini API는 Google AI Studio에서 무료로 발급받으실 수 있습니다.
+                  여기에 입력하신 API Key는 브라우저 로컬 스토리지에 저장되지 않고, 오직 Supabase DB 보안 테이블에만 안전하게 보관됩니다.
+                  로그인한 임직원 세션에서만 메모리에 임시 로드하여 사용하므로 외부 유출로부터 안전합니다.
                 </p>
                 <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type={isKeyVisible ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="AIZAsy..."
-                      className="w-full pl-4 pr-12 py-3 bg-white/10 focus:bg-white/15 border border-white/10 focus:border-[var(--color-accent-1)]/50 rounded-xl text-sm text-white font-mono outline-none transition-all placeholder-white/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setIsKeyVisible(!isKeyVisible)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
-                    >
-                      {isKeyVisible ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
+                  <input
+                    type="password"
+                    placeholder="AIzaSy..."
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="flex-1 px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm focus:outline-none focus:border-[var(--color-accent-1)] transition-colors"
+                  />
                   <button
                     type="submit"
-                    className="px-6 py-3 bg-[var(--color-accent-1)] text-[var(--color-primary)] font-black text-sm rounded-xl hover:bg-white hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-accent/20"
+                    className="px-6 py-3 bg-gradient-to-r from-[var(--color-accent-1)] to-[var(--color-accent-2)] text-white font-black rounded-xl text-sm hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
                   >
-                    저장하기
+                    {loading ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
+                    <span>저장</span>
                   </button>
                 </div>
               </form>
@@ -530,421 +676,342 @@ ${myHistory.length > 0 ? myHistory.map(h => `- ${h.year}년: 직급 ${h.position
         </AnimatePresence>
       </div>
 
-      {/* 2. Main Interaction Board */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* Left Side: Context / Control Box (5 cols) */}
-        <div className="lg:col-span-5 space-y-6">
-          
-          {userRole === 'evaluator' ? (
-            /* ================= EVALUATOR CONTROL ================= */
-            <div className="card space-y-6 overflow-visible">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">분석 대상 사원 선택</label>
-                <div className="relative">
+      {/* 2. 메인 워크스페이스 그리드 */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+        {/* 좌측 패널: 맥락 데이터 확인 영역 */}
+        <div className="space-y-6 lg:col-span-1">
+
+          {/* A. 사원 선택 패널 (평가자용) */}
+          {userRole === 'evaluator' && (
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl">
+              <h2 className="text-sm font-black text-white/50 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <User size={16} className="text-[var(--color-accent-2)]" />
+                <span>대상 사원 실시간 매핑</span>
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-white/60 font-bold block mb-2">분석할 사원 선택</label>
                   <select
-                    value={selectedEmpId}
-                    onChange={(e) => handleSelectEmployee(e.target.value)}
-                    className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl text-sm font-black text-gray-800 outline-none focus:border-[var(--color-primary)] focus:bg-white transition-all shadow-sm cursor-pointer appearance-none"
+                    value={selectedEmployeeId}
+                    onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                    className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-[var(--color-accent-1)] transition-all cursor-pointer"
                   >
-                    <option value="">-- 사원을 선택해 주세요 --</option>
                     {employees.map(emp => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.full_name} ({emp.department} • {emp.position})
+                      <option key={emp.id} value={emp.id} className="bg-slate-900 text-white">
+                        {emp.name} ({emp.department} / {emp.position})
                       </option>
                     ))}
                   </select>
-                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    <User size={18} />
-                  </div>
                 </div>
-              </div>
 
-              <AnimatePresence mode="wait">
-                {selectedEmpData ? (
-                  <motion.div
-                    key={selectedEmpId}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="space-y-5"
-                  >
-                    {/* 사원 종합 미니 프로필 카드 */}
-                    <div className="p-5 bg-gray-50 border border-gray-100 rounded-2xl space-y-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-[var(--color-primary)]/10 text-[var(--color-primary)] rounded-full flex items-center justify-center font-black">
-                          {selectedEmpData.profile.full_name[0]}
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900">{selectedEmpData.profile.full_name}</h4>
-                          <p className="text-[10px] text-gray-400 font-bold">{selectedEmpData.profile.department} • {selectedEmpData.profile.position}</p>
-                        </div>
+                {selectedEmployeeData && selectedEmployeeData.profile && (
+                  <div className="mt-4 p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                      <span className="text-sm font-black text-white">{selectedEmployeeData.profile.name}</span>
+                      <span className="text-xs font-bold text-white/60">{selectedEmployeeData.profile.position}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-white/40 block">부서</span>
+                        <span className="text-white/80 font-bold">{selectedEmployeeData.profile.department}</span>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200/50 text-xs font-medium text-gray-600">
-                        <div>
-                          <span className="text-[10px] text-gray-400 font-bold block mb-0.5">현재 연봉</span>
-                          <span className="font-black text-gray-800">{formatCurrency(selectedEmpData.profile.current_salary)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-gray-400 font-bold block mb-0.5">올해 고과 등급</span>
-                          <span className="font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md inline-block">
-                            {selectedEmpData.profile.performance_rating || 'B (기본)'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-gray-400 font-bold block mb-0.5">희망 요구안</span>
-                          <span className="font-black text-[var(--color-secondary)]">
-                            {selectedEmpData.negotiation?.evaluatee_proposal ? formatCurrency(selectedEmpData.negotiation.evaluatee_proposal) : '미제출'}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] text-gray-400 font-bold block mb-0.5">승진 요청 여부</span>
-                          <span className="font-black text-gray-800">{selectedEmpData.negotiation?.promotion_request ? '요청함' : '요청안함'}</span>
-                        </div>
+                      <div>
+                        <span className="text-white/40 block">이탈 위험</span>
+                        <span className={`font-black uppercase ${selectedEmployeeData.risk?.risk_level === 'HIGH' ? 'text-red-400' :
+                          selectedEmployeeData.risk?.risk_level === 'MEDIUM' ? 'text-yellow-400' : 'text-emerald-400'
+                          }`}>
+                          {selectedEmployeeData.risk?.risk_level || 'SAFE'}
+                        </span>
                       </div>
                     </div>
-
-                    {/* AI 기능 선택 버티컬 버튼 그룹 */}
-                    <div className="space-y-3 pt-2">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">AI 도구 선택</p>
-                      
-                      <button
-                        onClick={() => { setActiveSubTab('recommend'); handleEvaluatorAiAction('recommend'); }}
-                        className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                          activeSubTab === 'recommend'
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                            : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Coins size={18} className={activeSubTab === 'recommend' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                          <div>
-                            <p className="text-sm font-black">AI 추천 제안 연봉 산정</p>
-                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">등급/예산/시장 평균 연계 시뮬레이션</p>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveSubTab('script'); handleEvaluatorAiAction('script'); }}
-                        className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                          activeSubTab === 'script'
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                            : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <MessageSquare size={18} className={activeSubTab === 'script' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                          <div>
-                            <p className="text-sm font-black">설득 & 협상 1:1 대화집</p>
-                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">노고 칭찬부터 회사제안 납득까지 단계 스크립트</p>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} />
-                      </button>
-
-                      <button
-                        onClick={() => { setActiveSubTab('risk'); handleEvaluatorAiAction('risk'); }}
-                        className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                          activeSubTab === 'risk'
-                            ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                            : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <AlertTriangle size={18} className={activeSubTab === 'risk' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                          <div>
-                            <p className="text-sm font-black">이탈 위험 사원 리텐션 방안</p>
-                            <p className="text-[10px] text-gray-400 font-medium mt-0.5">이탈요인 정밀 분석 및 대안 복지/보상 설계</p>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-
-                  </motion.div>
-                ) : (
-                  <div className="h-48 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center p-6 text-gray-400 text-center">
-                    <BrainCircuit size={32} className="mb-2 opacity-35 animate-pulse" />
-                    <p className="text-xs font-bold leading-relaxed">위 드롭다운에서 임직원을 선택하시면<br/>데이터 통합 분석 및 AI 패널이 활성화됩니다.</p>
                   </div>
                 )}
-              </AnimatePresence>
-            </div>
-          ) : (
-            /* ================= EVALUATEE CONTROL ================= */
-            <div className="card space-y-6">
-              <div className="p-5 bg-gradient-to-br from-gray-50 to-white border border-gray-100 rounded-3xl space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[var(--color-secondary)]/10 text-[var(--color-secondary)] rounded-full flex items-center justify-center font-black">
-                    {profile?.full_name[0]}
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-gray-900">{profile?.full_name}</h4>
-                    <p className="text-[10px] text-gray-400 font-bold">{profile?.department} • {profile?.position}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200/50 text-xs font-medium text-gray-600">
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold block mb-0.5">현재 내 연봉</span>
-                    <span className="font-black text-gray-800">{formatCurrency(profile?.current_salary)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold block mb-0.5">올해 획득 등급</span>
-                    <span className="font-black text-[var(--color-primary)] bg-[var(--color-primary)]/10 px-2 py-0.5 rounded-md inline-block">
-                      {profile?.performance_rating || 'B'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold block mb-0.5">시장 평균 연봉</span>
-                    <span className="font-black text-gray-800">{myBenchmark ? formatCurrency(myBenchmark.avg_salary) : '정보 없음'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-gray-400 font-bold block mb-0.5">협상 대상 연도</span>
-                    <span className="font-black text-gray-800">{currentYear}년</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* 입력 연동 확인 피드백 아코디언/알림 */}
-              <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl space-y-2">
-                <div className="flex items-center gap-2 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <FileText size={12} />
-                  <span>협상 제안서 연계 상태</span>
-                </div>
-                {myJd || myReason ? (
-                  <p className="text-[11px] font-medium text-emerald-600 flex items-center gap-1">
-                    <CheckCircle size={14} />
-                    '연봉 협상' 탭에 기재한 성과 요약 및 JD가 연동되었습니다.
-                  </p>
-                ) : (
-                  <p className="text-[11px] font-medium text-amber-600 flex items-center gap-1">
-                    <AlertTriangle size={14} />
-                    '연봉 협상' 탭에서 성과/JD를 적으시면 분석 품질이 고도화됩니다.
-                  </p>
-                )}
-              </div>
-
-              {/* AI 기능 선택 버티컬 버튼 그룹 */}
-              <div className="space-y-3 pt-2">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-1">AI 도구 선택</p>
-                
-                <button
-                  onClick={() => { setActiveSubTab('pr'); handleEvaluateeAiAction('pr'); }}
-                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                    activeSubTab === 'pr'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                      : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <FileText size={18} className={activeSubTab === 'pr' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                    <div>
-                      <p className="text-sm font-black">나의 성과 자기 PR 제안서</p>
-                      <p className="text-[10px] text-gray-400 font-medium mt-0.5">STAR 기법 기반의 설득 초안 및 PR 문구</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-
-                <button
-                  onClick={() => { setActiveSubTab('objection'); handleEvaluateeAiAction('objection'); }}
-                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                    activeSubTab === 'objection'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                      : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <HelpCircle size={18} className={activeSubTab === 'objection' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                    <div>
-                      <p className="text-sm font-black">인사권자 반론 가이드북</p>
-                      <p className="text-[10px] text-gray-400 font-medium mt-0.5">예산 부족, 형평성 핑계 대처용 쿠션어 스크립트</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
-
-                <button
-                  onClick={() => { setActiveSubTab('suggest'); handleEvaluateeAiAction('suggest'); }}
-                  className={`w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-between text-left ${
-                    activeSubTab === 'suggest'
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-primary)] shadow-md shadow-primary/5'
-                      : 'border-gray-100 bg-white hover:border-gray-200 text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <TrendingUp size={18} className={activeSubTab === 'suggest' ? 'text-[var(--color-primary)]' : 'text-gray-400'} />
-                    <div>
-                      <p className="text-sm font-black">적정 희망연봉 가이드라인</p>
-                      <p className="text-[10px] text-gray-400 font-medium mt-0.5">시장 벤치마크 및 등급 결합 현실성 시뮬레이터</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} />
-                </button>
               </div>
             </div>
           )}
 
+          {/* B. 데이터 컨텍스트 요약 보드 */}
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl space-y-6">
+            <h2 className="text-sm font-black text-white/50 uppercase tracking-wider flex items-center gap-2">
+              <FileText size={16} className="text-[var(--color-accent-1)]" />
+              <span>AI 인풋 데이터 컨텍스트</span>
+            </h2>
+
+            {userRole === 'evaluator' ? (
+              // 평가자용 데이터 요약 뷰어
+              selectedEmployeeData ? (
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-xs text-white/40 font-bold block mb-1">최근 연봉 추이 (최대 5년)</span>
+                    <div className="space-y-1 bg-black/20 p-3 rounded-xl border border-white/5 text-[11px] font-mono">
+                      {selectedEmployeeData.history.length > 0 ? (
+                        selectedEmployeeData.history.map((h, i) => (
+                          <div key={i} className="flex justify-between text-white/80">
+                            <span>{h.year}년 ({h.performance_rating})</span>
+                            <span className="font-bold">{h.salary.toLocaleString()}원</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-white/40 text-center py-2">등록된 과거 연봉 이력이 없습니다.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-white/40 font-bold block mb-1">소속 부서 잔여 예산</span>
+                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs">
+                      {selectedEmployeeData.budget ? (
+                        <div className="flex justify-between text-white/80 font-bold">
+                          <span>잔여 / 총 예산</span>
+                          <span className="text-[var(--color-accent-1)]">
+                            {(selectedEmployeeData.budget.total_budget - selectedEmployeeData.budget.spent_budget).toLocaleString()}원 / {selectedEmployeeData.budget.total_budget.toLocaleString()}원
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-white/40 text-center py-1">예산 정보 미등록</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-white/40 font-bold block mb-1">시장 연봉 평균 (동종)</span>
+                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs text-white/80 font-bold flex justify-between">
+                      <span>시장 평균값</span>
+                      <span>{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.average.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-white/40 text-xs text-center py-6">사원을 선택하시면 AI 입력 데이터가 바인딩됩니다.</div>
+              )
+            ) : (
+              // 피평가자용 데이터 요약 뷰어
+              myContextData ? (
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-xs text-white/40 font-bold block mb-1">나의 과거 이력 요약</span>
+                    <div className="space-y-1 bg-black/20 p-3 rounded-xl border border-white/5 text-[11px] font-mono">
+                      {myContextData.history.length > 0 ? (
+                        myContextData.history.map((h, i) => (
+                          <div key={i} className="flex justify-between text-white/80">
+                            <span>{h.year}년 ({h.performance_rating})</span>
+                            <span className="font-bold">{h.salary.toLocaleString()}원</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-white/40 text-center py-2">등록된 과거 연봉 이력이 없습니다.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-xs text-white/40 font-bold block mb-1">내 직군 시장 연봉 기준</span>
+                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs text-white/80 font-bold flex justify-between">
+                      <span>시장 평균가</span>
+                      <span>{myContextData.benchmark ? myContextData.benchmark.average.toLocaleString() + '원' : '벤치마크 미등록'}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[var(--color-accent-1)]/10 rounded-xl border border-[var(--color-accent-1)]/20 text-xs text-[var(--color-accent-1)] leading-relaxed font-semibold">
+                    💡 기제출한 성과기술서 요약이 AI 프롬프트 입력 맥락으로 자동 바인딩되어 있습니다.
+                  </div>
+                </div>
+              ) : (
+                <div className="text-white/40 text-xs text-center py-6">데이터를 불러오는 중입니다...</div>
+              )
+            )}
+          </div>
         </div>
 
-        {/* Right Side: AI Response Screen (7 cols) */}
-        <div className="lg:col-span-7">
-          <div className="card min-h-[500px] flex flex-col h-full relative overflow-hidden bg-white border border-gray-100 rounded-3xl">
-            {/* AI Screen Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-[var(--color-accent-1)] animate-ping" />
-                <span className="text-xs font-black text-gray-800 tracking-tight">AI 실시간 분석 화면</span>
+        {/* 우측 패널: AI 도구 버튼 & 결과 리포트 출력 창 */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* AI 분석 버튼 탭 카드 */}
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl">
+            <h2 className="text-sm font-black text-white/50 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Brain size={16} className="text-[var(--color-accent-1)]" />
+              <span>실행할 AI 협상 도구 선택</span>
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {userRole === 'evaluator' ? (
+                // 평가자(Evaluator) 전용 버튼 3개
+                <>
+                  <button
+                    onClick={() => {
+                      setActiveTab('recommend');
+                      triggerAiAnalysis('recommend');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'recommend'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <TrendingUp size={24} className="text-[var(--color-accent-1)] mb-2" />
+                    <div className="font-black text-sm">AI 추천 연봉 산정</div>
+                    <div className="text-[10px] text-white/50 mt-1">예산 및 기여도 복합 분석 추천액 도출</div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('script');
+                      triggerAiAnalysis('script');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'script'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <Briefcase size={24} className="text-[var(--color-accent-2)] mb-2" />
+                    <div className="font-black text-sm">1:1 면담 설득 대화집</div>
+                    <div className="text-[10px] text-white/50 mt-1">사원 성향/요구에 맞춘 면담 대본 빌드</div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('retention');
+                      triggerAiAnalysis('retention');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'retention'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <ShieldAlert size={24} className="text-red-400 mb-2" />
+                    <div className="font-black text-sm">이탈 인재 리텐션안</div>
+                    <div className="text-[10px] text-white/50 mt-1">핵심 인재 잔류 전략 및 맞춤 보상책</div>
+                  </button>
+                </>
+              ) : (
+                // 피평가자(Evaluatee) 전용 버튼 3개
+                <>
+                  <button
+                    onClick={() => {
+                      setActiveTab('pr');
+                      triggerAiAnalysis('pr');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'pr'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <FileText size={24} className="text-[var(--color-accent-1)] mb-2" />
+                    <div className="font-black text-sm">나의 성과 자기 PR 초안</div>
+                    <div className="text-[10px] text-white/50 mt-1">STAR 기법을 적용한 성과 설득서 제작</div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('objection');
+                      triggerAiAnalysis('objection');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'objection'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <HelpCircle size={24} className="text-[var(--color-accent-2)] mb-2" />
+                    <div className="font-black text-sm">인사권자 반론 가이드북</div>
+                    <div className="text-[10px] text-white/50 mt-1">예산동결/밴드제한에 대처하는 모범답변</div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('simulate');
+                      triggerAiAnalysis('simulate');
+                    }}
+                    className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'simulate'
+                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
+                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-white/80'
+                      }`}
+                  >
+                    <DollarSign size={24} className="text-emerald-400 mb-2" />
+                    <div className="font-black text-sm">적정 희망연봉 시뮬레이터</div>
+                    <div className="text-[10px] text-white/50 mt-1">업계 벤치마크 기반 타결 가이드라인</div>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* AI 결과 리포트 출력 창 */}
+          <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-2xl min-h-[450px] relative flex flex-col justify-between overflow-hidden">
+            {/* 배경 미세 글로우 */}
+            <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
+
+            <div className="relative">
+              {/* 리포트 상단 타이틀 바 */}
+              <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-6">
+                <div className="flex items-center gap-2">
+                  <Brain className="text-[var(--color-accent-1)]" size={20} />
+                  <span className="text-xs font-black text-white/50 uppercase tracking-widest">AI 전략 분석 리포트 결과</span>
+                </div>
+                {aiResponse && !loading && (
+                  <button
+                    onClick={() => {
+                      const element = document.createElement("a");
+                      const file = new Blob([aiResponse], { type: 'text/plain' });
+                      element.href = URL.createObjectURL(file);
+                      element.download = `SalarySync_AI_Report_${activeTab}.md`;
+                      document.body.appendChild(element);
+                      element.click();
+                      document.body.removeChild(element);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-white/80 transition-all active:scale-95"
+                  >
+                    <Download size={14} />
+                    <span>Markdown 다운로드</span>
+                  </button>
+                )}
               </div>
-              {aiResponse && !loading && (
-                <button
-                  onClick={() => {
-                    if (userRole === 'evaluator') {
-                      handleEvaluatorAiAction(activeSubTab);
-                    } else {
-                      handleEvaluateeAiAction(activeSubTab);
-                    }
-                  }}
-                  className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-[var(--color-primary)] transition-colors flex items-center gap-1.5 text-xs font-bold"
-                  title="다시 생성하기"
-                >
-                  <RefreshCw size={14} />
-                  <span>다시 생성</span>
-                </button>
+
+              {/* 1. 로딩 맥동 및 스켈레톤 화면 */}
+              {loading ? (
+                <div className="space-y-6 py-6">
+                  <div className="flex items-center gap-3 text-[var(--color-accent-1)] font-extrabold text-sm animate-pulse">
+                    <RefreshCw className="animate-spin" size={18} />
+                    <span>AI 컨설턴트가 다중 데이터 컨텍스트를 연산하여 전략을 도출하고 있습니다...</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="h-6 bg-white/5 rounded-lg w-1/3 animate-pulse" />
+                    <div className="h-4 bg-white/5 rounded-lg w-full animate-pulse" />
+                    <div className="h-4 bg-white/5 rounded-lg w-5/6 animate-pulse" />
+                    <div className="h-4 bg-white/5 rounded-lg w-4/5 animate-pulse" />
+                    <div className="h-24 bg-white/5 rounded-2xl w-full animate-pulse mt-4" />
+                  </div>
+                </div>
+              ) : aiResponse ? (
+                // 2. 렌더링된 결과 출력
+                <div className="prose prose-invert max-w-none text-white/90">
+                  {renderResponseBlocks()}
+                </div>
+              ) : (
+                // 3. 대기 화면 (Default)
+                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                  <div className="p-4 bg-white/5 border border-white/5 rounded-3xl text-white/30">
+                    <Sparkles size={48} />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-black text-base">분석 대기 중</h3>
+                    <p className="text-white/40 text-xs max-w-xs mx-auto mt-1 leading-relaxed">
+                      상단의 AI 도구 버튼 중 하나를 클릭하시면 Supabase의 실시간 보상 데이터와 연계되어 맞춤 보고서가 도출됩니다.
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
 
-            {/* AI Screen Content */}
-            <div className="flex-1 flex flex-col mt-6 overflow-y-auto">
-              <AnimatePresence mode="wait">
-                {loading ? (
-                  /* ================= SKELETON LOADER STATE ================= */
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex-1 flex flex-col justify-center space-y-6 py-12"
-                  >
-                    <div className="flex justify-center">
-                      <div className="relative">
-                        <div className="w-16 h-16 border-4 border-[var(--color-primary)]/20 border-t-[var(--color-primary)] rounded-full animate-spin" />
-                        <BrainCircuit size={28} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[var(--color-primary)] animate-pulse" />
-                      </div>
-                    </div>
-                    <div className="space-y-3 max-w-md mx-auto w-full text-center">
-                      <p className="text-sm font-black text-gray-800 animate-bounce">
-                        {userRole === 'evaluator' ? '사원 이력 및 예산 빅데이터 종합 정밀 분석 중...' : '시장 벤치마크 및 기여 가치 시뮬레이션 중...'}
-                      </p>
-                      <p className="text-[11px] text-gray-400 font-bold">인공지능 어시스턴트가 최적의 커스텀 분석 가이드를 빌드하고 있습니다. 약 5~10초 소요됩니다.</p>
-                      
-                      {/* 스켈레톤 라인 */}
-                      <div className="pt-6 space-y-2 max-w-sm mx-auto">
-                        <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-full" />
-                        <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-11/12 mx-auto" />
-                        <div className="h-3.5 bg-gray-100 rounded-full animate-pulse w-10/12 mx-auto" />
-                      </div>
-                    </div>
-                  </motion.div>
-                ) : aiResponse ? (
-                  /* ================= AI RESPONSE STATE ================= */
-                  <motion.div
-                    key="response"
-                    initial={{ opacity: 0, y: 15 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    className="flex-1 flex flex-col"
-                  >
-                    {/* Rendered Styled Markdown Container */}
-                    <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed font-medium pb-8 space-y-4">
-                      {aiResponse.split('\n').map((line, idx) => {
-                        // Title H1, H2, H3
-                        if (line.startsWith('# ')) {
-                          return <h1 key={idx} className="text-xl font-black text-[var(--color-primary)] pt-4 pb-2 border-b border-gray-100">{line.replace('# ', '')}</h1>;
-                        }
-                        if (line.startsWith('## ')) {
-                          return <h2 key={idx} className="text-lg font-black text-gray-900 pt-4 pb-1">{line.replace('## ', '')}</h2>;
-                        }
-                        if (line.startsWith('### ')) {
-                          return <h3 key={idx} className="text-sm font-black text-gray-800 pt-3 pb-0.5">{line.replace('### ', '')}</h3>;
-                        }
-                        
-                        // Strong text highlight in blocks
-                        let renderedLine = line;
-                        
-                        // Alert / Quote block
-                        if (line.startsWith('> ')) {
-                          return (
-                            <blockquote key={idx} className="border-l-4 border-[var(--color-accent-1)] bg-gray-50 p-4 rounded-r-xl italic my-2 text-xs font-semibold text-gray-600">
-                              {line.replace('> ', '')}
-                            </blockquote>
-                          );
-                        }
-                        
-                        // List bullet
-                        if (line.startsWith('- ') || line.startsWith('* ')) {
-                          const cleanLine = line.replace(/^[-*]\s+/, '');
-                          return (
-                            <li key={idx} className="ml-4 list-disc text-xs font-medium py-0.5 text-gray-600">
-                              {cleanLine.includes('**') ? parseStrongText(cleanLine) : cleanLine}
-                            </li>
-                          );
-                        }
-
-                        // Normal paragraph (supports double asterisks ** for bold)
-                        if (line.trim() === '') return <div key={idx} className="h-2" />;
-                        
-                        return (
-                          <p key={idx} className="text-xs text-gray-600 leading-relaxed font-medium">
-                            {line.includes('**') ? parseStrongText(line) : line}
-                          </p>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                ) : (
-                  /* ================= EMPTY STATE ================= */
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex-1 flex flex-col items-center justify-center py-12 text-center text-gray-400"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-4">
-                      <Sparkles size={28} className="opacity-25" />
-                    </div>
-                    <h3 className="text-sm font-black text-gray-800 mb-1">AI 도우미가 분석을 시작할 준비가 되었습니다</h3>
-                    <p className="text-xs max-w-sm mx-auto leading-relaxed">
-                      {userRole === 'evaluator' 
-                        ? '왼쪽 패널에서 사원을 지정하고 원하시는 AI 분석 도구를 선택하시면, 해당 사원의 모든 데이터를 정밀 분석하여 결과를 생성합니다.' 
-                        : '왼쪽 패널에서 원하시는 AI 분석 도구를 선택하시면, 내 이력과 벤치마크 데이터를 통합 종합 분석하여 결과를 생성합니다.'}
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            {/* 하단 미세 서명 */}
+            <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center text-[10px] text-white/30 font-semibold relative">
+              <span>SalarySync AI Recommendation System v2.5</span>
+              <span>Secure Session Binding Enabled</span>
             </div>
           </div>
+
         </div>
 
       </div>
     </div>
   );
-};
-
-// ** (Double asterisk) 파싱 헬퍼 함수
-const parseStrongText = (text) => {
-  const parts = text.split(/\*\*([^*]+)\*\*/g);
-  return parts.map((part, index) => {
-    if (index % 2 === 1) {
-      return <strong key={index} className="font-black text-gray-950 bg-amber-50 px-1 py-0.5 rounded-md">{part}</strong>;
-    }
-    return part;
-  });
-};
-
-export default AiAssistant;
+}
