@@ -162,7 +162,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation
           <div className="space-y-6 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
             {/* 직무기술서 섹션 */}
             <div className="space-y-2.5">
-              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">직무기술서 (Job Description)</span>
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">직무기술서</span>
               <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 min-h-[120px] shadow-sm">
                 <p className="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-line">
                   {negotiation?.jd || '등록된 직무기술서 내용이 존재하지 않습니다.'}
