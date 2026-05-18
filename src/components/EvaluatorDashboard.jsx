@@ -67,28 +67,6 @@ const formatCurrencySimple = (value) => {
   return num.toLocaleString() + '원';
 };
 
-// 시인성이 극대화된 한국어 억/만 단위 병기 금액 포맷터
-const formatCurrencyKorean = (value) => {
-  if (!value && value !== 0) return '-';
-  const num = Number(value);
-  const formattedNum = num.toLocaleString() + '원';
-  
-  if (num >= 10000) {
-    let koreanStr = '';
-    if (num >= 100000000) {
-      const eok = Math.floor(num / 100000000);
-      const rest = num % 100000000;
-      const man = Math.floor(rest / 10000);
-      koreanStr = `${eok}억${man > 0 ? ` ${man.toLocaleString()}만` : ''}원`;
-    } else {
-      const man = Math.floor(num / 10000);
-      koreanStr = `${man.toLocaleString()}만원`;
-    }
-    return `${formattedNum} (${koreanStr})`;
-  }
-  return formattedNum;
-};
-
 // 입력용 천단위 구분기호 포맷터 (순수 숫자만 반환/포맷)
 const formatInputCurrency = (value) => {
   if (!value && value !== 0) return '';
@@ -1105,13 +1083,13 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">배정 총예산</p>
-                  <p className="text-2xl font-black text-gray-900">{formatCurrencyKorean(currentBudgetContext.limit)}</p>
+                  <p className="text-2xl font-black text-gray-900">{formatCurrencySimple(currentBudgetContext.limit)}</p>
                 </div>
                 
                 <div className="space-y-1 relative">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">현재 사용액</p>
                   <div className="flex items-baseline gap-2">
-                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrencyKorean(currentBudgetContext.used)}</p>
+                    <p className="text-2xl font-black text-[var(--color-primary)]">{formatCurrencySimple(currentBudgetContext.used)}</p>
                     <span className="text-xs font-black text-gray-400">({Math.round(budgetPercentage)}%)</span>
                   </div>
                 </div>
@@ -1119,7 +1097,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                 <div className="space-y-1">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">잔여 예산</p>
                   <p className={`text-2xl font-black ${currentBudgetContext.limit - currentBudgetContext.used < 0 ? 'text-red-500' : 'text-[var(--color-secondary)]'}`}>
-                    {formatCurrencyKorean(currentBudgetContext.limit - currentBudgetContext.used)}
+                    {formatCurrencySimple(currentBudgetContext.limit - currentBudgetContext.used)}
                   </p>
                 </div>
               </div>
@@ -1181,7 +1159,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                 </span>
                               </div>
                               <p className="text-[10px] text-gray-400 font-medium mt-0.5">
-                                요구: <span className="font-bold text-orange-600">{formatCurrencyKorean(item.evaluatee_proposal)}</span>
+                                요구: <span className="font-bold text-orange-600">{formatCurrency(item.evaluatee_proposal)}</span>
                               </p>
                             </div>
                           </div>
@@ -1402,7 +1380,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                                       {hoveredDot.evaluatee_name} ({hoveredDot.performance_rating}등급)
                                     </text>
                                     <text x="0" y={tooltipRectY + 45} fill="#94A3B8" fontSize="12" textAnchor="middle">
-                                      연봉: {formatCurrencyKorean(hoveredDot.currentVal)}
+                                      연봉: {formatCurrency(hoveredDot.currentVal)}
                                     </text>
                                     <text x="0" y={tooltipRectY + 66} fill="#A4D65E" fontSize="12" fontWeight="bold" textAnchor="middle">
                                       인상률: {hoveredDot.rateFormatted}%
@@ -1725,12 +1703,12 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                       <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                         <div>
                           <p className="text-[9px] font-black text-gray-300 uppercase mb-0.5">현재 연봉</p>
-                          <p className="text-[11px] font-black text-gray-500">{formatCurrencyKorean(item.salary)}</p>
+                          <p className="text-[11px] font-black text-gray-500">{formatCurrencySimple(item.salary)}</p>
                         </div>
                         {item.proposal ? (
                           <div className="text-right">
                             <p className="text-[9px] font-black text-[var(--color-primary)]/40 uppercase mb-0.5">인사팀 제안</p>
-                            <p className="text-[11px] font-black text-[var(--color-primary)]">{formatCurrencyKorean(item.proposal)}</p>
+                            <p className="text-[11px] font-black text-[var(--color-primary)]">{formatCurrencySimple(item.proposal)}</p>
                           </div>
                         ) : (
                           <div className="text-right">
@@ -1808,7 +1786,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-50 flex flex-col justify-between h-32 transition-all hover:scale-[1.02]">
                               <span className="text-[10px] font-black text-gray-400 uppercase">현재 연봉</span>
                               <div>
-                                <p className="text-xl font-black text-gray-700">{formatCurrencyKorean(actualCurrentSalary)}</p>
+                                <p className="text-xl font-black text-gray-700">{formatCurrencySimple(actualCurrentSalary)}</p>
                                 <p className="text-[9px] font-bold text-gray-300 mt-1">기준 연봉</p>
                               </div>
                             </div>
@@ -1825,10 +1803,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                               </div>
                               <div>
                                 <p className={`text-xl font-black ${hopeProposal > 0 ? 'text-[var(--color-primary)]' : 'text-gray-300'}`}>
-                                  {hopeProposal > 0 ? formatCurrencyKorean(hopeProposal) : '미제출'}
+                                  {hopeProposal > 0 ? formatCurrencySimple(hopeProposal) : '미제출'}
                                 </p>
                                 {hopeProposal > 0 && (
-                                  <p className="text-[9px] font-bold text-[var(--color-primary)]/40 mt-1">인상액: {formatCurrencyKorean(hopeProposal - actualCurrentSalary)}</p>
+                                  <p className="text-[9px] font-bold text-[var(--color-primary)]/40 mt-1">인상액: {formatCurrencySimple(hopeProposal - actualCurrentSalary)}</p>
                                 )}
                               </div>
                             </div>
@@ -1845,10 +1823,10 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                               </div>
                               <div>
                                 <p className={`text-xl font-black ${evalProposal > 0 ? 'text-[var(--color-secondary)]' : 'text-gray-300'}`}>
-                                  {evalProposal > 0 ? formatCurrencyKorean(evalProposal) : '미제안'}
+                                  {evalProposal > 0 ? formatCurrencySimple(evalProposal) : '미제안'}
                                 </p>
                                 {evalProposal > 0 && (
-                                  <p className="text-[9px] font-bold text-[var(--color-secondary)]/40 mt-1">인상액: {formatCurrencyKorean(evalProposal - actualCurrentSalary)}</p>
+                                  <p className="text-[9px] font-bold text-[var(--color-secondary)]/40 mt-1">인상액: {formatCurrencySimple(evalProposal - actualCurrentSalary)}</p>
                                 )}
                               </div>
                             </div>
@@ -1968,7 +1946,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
                               <div className="grid grid-cols-2 gap-4">
                                 <div>
                                   <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase">연봉</p>
-                                  <p className="text-base font-black text-gray-900">{formatCurrencyKorean(h.salary)}</p>
+                                  <p className="text-base font-black text-gray-900">{formatCurrency(h.salary)}</p>
                                 </div>
                                 <div>
                                   <p className="text-[10px] font-bold text-gray-400 mb-1 uppercase">인상률</p>
