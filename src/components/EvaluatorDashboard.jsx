@@ -67,12 +67,12 @@ const formatCurrencySimple = (value) => {
   return num.toLocaleString() + '원';
 };
 
-// 입력용 천단위 구분기호 포맷터 (순수 숫자만 반환/포맷)
+// 입력용 천단위 구분기호 및 원화 포맷터 (입력창 내 '원' 문자 자동 유지를 위함)
 const formatInputCurrency = (value) => {
   if (!value && value !== 0) return '';
   const num = value.toString().replace(/[^0-9]/g, '');
   if (!num) return '';
-  return Number(num).toLocaleString();
+  return Number(num).toLocaleString() + '원';
 };
 
 
@@ -123,7 +123,7 @@ const BudgetDonut = ({ percentage, label, color = "var(--color-primary)" }) => {
   );
 };
 
-const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }) => {
+const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, negotiation, onConfirm }) => {
   const [offer, setOffer] = useState('');
   const [comment, setComment] = useState('');
 
@@ -143,7 +143,7 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
       />
       <motion.div 
         initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-10 w-full max-w-lg shadow-2xl relative z-10 border border-gray-100"
+        className="bg-white rounded-3xl p-10 w-full max-w-4xl shadow-2xl relative z-10 border border-gray-100"
       >
         <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
           <div>
@@ -155,44 +155,72 @@ const CounterOfferPopup = ({ isOpen, onClose, name, currentProposal, onConfirm }
           </button>
         </div>
 
-        <div className="space-y-6">
-          {/* 사원 최종 요구안 */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">사원 최종 요구안</span>
-            <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl">
-              <span className="text-sm font-bold text-gray-500">요구 연봉</span>
-              <span className="text-lg font-black text-gray-900">{formatCurrency(cleanProposal)}</span>
+        {/* 좌우 2컬럼 레이아웃 적용 */}
+        <div className="grid grid-cols-2 gap-8 items-start">
+          
+          {/* [좌측 컬럼] 사원 직무기술서 및 협상 근거 자료 */}
+          <div className="space-y-6 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
+            {/* 직무기술서 섹션 */}
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">직무기술서 (Job Description)</span>
+              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 min-h-[120px] shadow-sm">
+                <p className="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-line">
+                  {negotiation?.jd || '등록된 직무기술서 내용이 존재하지 않습니다.'}
+                </p>
+              </div>
+            </div>
+
+            {/* 연봉 요구 근거 섹션 */}
+            <div className="space-y-2.5">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">인상 요구 및 타당성 근거</span>
+              <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 min-h-[160px] shadow-sm">
+                <p className="text-xs font-bold text-gray-700 leading-relaxed whitespace-pre-line">
+                  {negotiation?.reason || '등록된 협상 인상 근거 자료가 존재하지 않습니다.'}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* 회사 제안 연봉 */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">회사 제안 연봉</span>
-            <input 
-              type="text" 
-              className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none text-lg font-black text-[var(--color-primary)] transition-all placeholder:text-gray-300"
-              placeholder="제시 연봉 (예: 72,000,000원)" 
-              value={formatInputCurrency(offer)} 
-              onChange={(e) => {
-                const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                setOffer(rawValue);
-              }}
-            />
-          </div>
+          {/* [우측 컬럼] 회사 조건 제시 입력 폼 */}
+          <div className="space-y-6">
+            {/* 사원 최종 요구안 */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">사원 최종 요구안</span>
+              <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-100 rounded-2xl">
+                <span className="text-sm font-bold text-gray-500">요구 연봉</span>
+                <span className="text-lg font-black text-gray-900">{formatCurrency(cleanProposal)}</span>
+              </div>
+            </div>
 
-          {/* 검토 의견 */}
-          <div className="space-y-2">
-            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">검토 의견</span>
-            <textarea 
-              className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none h-32 text-sm font-medium transition-all placeholder:text-gray-300 resize-none"
-              placeholder="검토 의견을 성실히 입력해 주세요."
-              value={comment} 
-              onChange={(e) => setComment(e.target.value)}
-            />
+            {/* 회사 제안 연봉 */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">회사 제안 연봉</span>
+              <input 
+                type="text" 
+                className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none text-lg font-black text-[var(--color-primary)] transition-all placeholder:text-gray-300"
+                placeholder="제시 연봉 (예: 72,000,000원)" 
+                value={formatInputCurrency(offer)} 
+                onChange={(e) => {
+                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  setOffer(rawValue);
+                }}
+              />
+            </div>
+
+            {/* 검토 의견 */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest block">검토 의견</span>
+              <textarea 
+                className="w-full p-4 bg-white border border-gray-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/5 rounded-2xl outline-none h-32 text-sm font-medium transition-all placeholder:text-gray-300 resize-none"
+                placeholder="검토 의견을 성실히 입력해 주세요."
+                value={comment} 
+                onChange={(e) => setComment(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 
-        <div className="flex gap-3 mt-10">
+        <div className="flex gap-3 mt-10 border-t border-gray-100 pt-6">
           <button onClick={onClose} className="flex-1 py-4 text-sm font-black text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">취소</button>
           <button 
             onClick={() => onConfirm(offer, comment)}
@@ -2015,7 +2043,7 @@ const EvaluatorDashboard = ({ profile, currentTab, currentYear }) => {
         )}
       </AnimatePresence>
 
-      <CounterOfferPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} name={selectedNegotiation?.evaluatee_name} currentProposal={selectedNegotiation?.evaluatee_proposal} onConfirm={(offer, comment) => handleStatusUpdate(selectedNegotiation.id, 'submitted', { evaluator_proposal: offer, evaluator_comment: comment })} />
+      <CounterOfferPopup isOpen={isPopupOpen} onClose={() => setIsPopupOpen(false)} name={selectedNegotiation?.evaluatee_name} currentProposal={selectedNegotiation?.evaluatee_proposal} negotiation={selectedNegotiation} onConfirm={(offer, comment) => handleStatusUpdate(selectedNegotiation.id, 'submitted', { evaluator_proposal: offer, evaluator_comment: comment })} />
 
       <SalaryNegotiationPopup 
         isOpen={isSalaryPopupOpen} onClose={() => { setIsSalaryPopupOpen(false); setSelectedEmployeeForSalary(null); }}
