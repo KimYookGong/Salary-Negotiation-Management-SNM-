@@ -1032,10 +1032,10 @@ ${myNegStr}
           </div>
 
           {/* AI 결과 리포트 출력 창 */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm min-h-[450px] relative flex flex-col justify-between overflow-hidden">
-            <div className="relative">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm h-[750px] relative flex flex-col justify-between overflow-hidden">
+            <div className="flex flex-col h-[calc(100%-40px)]">
               {/* 리포트 상단 타이틀 바 */}
-              <div className="flex justify-between items-center pb-4 border-b border-slate-200 mb-6">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200 mb-6 flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Brain className="text-indigo-600" size={20} />
                   <span className="text-xs font-black text-slate-800 uppercase tracking-widest">AI 전략 분석 리포트 결과</span>
@@ -1059,44 +1059,46 @@ ${myNegStr}
                 )}
               </div>
 
-              {/* 1. 로딩 맥동 및 스켈레톤 화면 */}
-              {loading ? (
-                <div className="space-y-6 py-6">
-                  <div className="flex items-center gap-3 text-indigo-600 font-extrabold text-sm animate-pulse">
-                    <RefreshCw className="animate-spin" size={18} />
-                    <span>AI 컨설턴트가 다중 데이터 컨텍스트를 연산하여 전략을 도출하고 있습니다...</span>
+              {/* 스크롤 가능한 컨텐츠 영역 */}
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-6">
+                {loading ? (
+                  <div className="space-y-6 py-6">
+                    <div className="flex items-center gap-3 text-indigo-600 font-extrabold text-sm animate-pulse">
+                      <RefreshCw className="animate-spin" size={18} />
+                      <span>AI 컨설턴트가 다중 데이터 컨텍스트를 연산하여 전략을 도출하고 있습니다...</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="h-6 bg-slate-100 rounded-lg w-1/3 animate-pulse" />
+                      <div className="h-4 bg-slate-100 rounded-lg w-full animate-pulse" />
+                      <div className="h-4 bg-slate-100 rounded-lg w-5/6 animate-pulse" />
+                      <div className="h-4 bg-slate-100 rounded-lg w-4/5 animate-pulse" />
+                      <div className="h-24 bg-slate-100 rounded-2xl w-full animate-pulse mt-4" />
+                    </div>
                   </div>
-                  <div className="space-y-3">
-                    <div className="h-6 bg-slate-100 rounded-lg w-1/3 animate-pulse" />
-                    <div className="h-4 bg-slate-100 rounded-lg w-full animate-pulse" />
-                    <div className="h-4 bg-slate-100 rounded-lg w-5/6 animate-pulse" />
-                    <div className="h-4 bg-slate-100 rounded-lg w-4/5 animate-pulse" />
-                    <div className="h-24 bg-slate-100 rounded-2xl w-full animate-pulse mt-4" />
+                ) : aiResponse ? (
+                  // 2. 렌더링된 결과 출력
+                  <div className="prose prose-slate max-w-none text-slate-800 pb-6">
+                    {renderResponseBlocks()}
                   </div>
-                </div>
-              ) : aiResponse ? (
-                // 2. 렌더링된 결과 출력
-                <div className="prose prose-slate max-w-none text-slate-800">
-                  {renderResponseBlocks()}
-                </div>
-              ) : (
-                // 3. 대기 화면 (Default)
-                <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-3xl text-slate-400">
-                    <Sparkles size={48} className="text-slate-300" />
+                ) : (
+                  // 3. 대기 화면 (Default)
+                  <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
+                    <div className="p-4 bg-slate-50 border border-slate-150 rounded-3xl text-slate-400">
+                      <Sparkles size={48} className="text-slate-300" />
+                    </div>
+                    <div>
+                      <h3 className="text-slate-800 font-black text-base">분석 대기 중</h3>
+                      <p className="text-slate-500 text-xs max-w-xs mx-auto mt-1 leading-relaxed">
+                        상단의 AI 도구 버튼 중 하나를 클릭하시면 Supabase의 실시간 보상 데이터와 연계되어 맞춤 보고서가 도출됩니다.
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-slate-800 font-black text-base">분석 대기 중</h3>
-                    <p className="text-slate-500 text-xs max-w-xs mx-auto mt-1 leading-relaxed">
-                      상단의 AI 도구 버튼 중 하나를 클릭하시면 Supabase의 실시간 보상 데이터와 연계되어 맞춤 보고서가 도출됩니다.
-                    </p>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* 하단 미세 서명 */}
-            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-semibold relative">
+            <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-semibold relative flex-shrink-0">
               <span>SalarySync AI Recommendation System v2.5</span>
               <span>Secure Session Binding Enabled</span>
             </div>
