@@ -355,7 +355,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
             ],
             generationConfig: {
               temperature: 0.2, // 논리적 연산과 제안 논거 생성을 위해 정밀도 향상
-              maxOutputTokens: 2548
+              maxOutputTokens: 8192
             }
           })
         }
@@ -599,63 +599,121 @@ ${myNegStr}
     });
   };
 
-  // 문단을 예쁘게 나누어 마크다운 리포트 카드 형태로 파싱
   const renderResponseBlocks = () => {
     if (!aiResponse) return null;
 
     const lines = aiResponse.split('\n');
+    const blocks = [];
+    let currentList = null;
+
+    lines.forEach((line, index) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        if (currentList) {
+          blocks.push(currentList);
+          currentList = null;
+        }
+        blocks.push(<div key={`empty-${index}`} className="h-2" />);
+        return;
+      }
+
+      // Check if it's a list item (with space to prevent bold markup ** triggering lists)
+      if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const content = parseStrongText(trimmed.substring(2).trim());
+        const item = (
+          <li key={`li-${index}`} className="leading-relaxed text-sm text-slate-800">
+            {content}
+          </li>
+        );
+
+        if (currentList && currentList.type === 'ul') {
+          currentList.items.push(item);
+        } else {
+          if (currentList) {
+            blocks.push(currentList);
+          }
+          currentList = {
+            type: 'ul',
+            key: `ul-${index}`,
+            items: [item]
+          };
+        }
+        return;
+      }
+
+      // Numbered list item (checking for a space after dot)
+      if (/^\d+\.\s/.test(trimmed)) {
+        const match = trimmed.match(/^(\d+)\.\s(.*)/);
+        const num = match[1];
+        const textContent = match[2];
+        const content = parseStrongText(textContent.trim());
+        const item = (
+          <div key={`ol-item-${index}`} className="pl-2 py-1 flex gap-2 items-start text-sm leading-relaxed text-slate-800">
+            <span className="font-black text-[var(--color-accent-2)] min-w-[20px]">{num}.</span>
+            <p className="flex-1">{content}</p>
+          </div>
+        );
+
+        if (currentList) {
+          blocks.push(currentList);
+          currentList = null;
+        }
+        blocks.push(item);
+        return;
+      }
+
+      // If we reach here, it's a header or standard paragraph
+      if (currentList) {
+        blocks.push(currentList);
+        currentList = null;
+      }
+
+      // Header H3
+      if (trimmed.startsWith('###')) {
+        blocks.push(
+          <h3 key={index} className="text-lg font-black text-slate-900 mt-6 mb-3 flex items-center gap-2 border-b border-slate-200 pb-2">
+            <Brain size={18} className="text-[var(--color-accent-1)]" />
+            {parseStrongText(trimmed.replace('###', '').trim())}
+          </h3>
+        );
+        return;
+      }
+
+      // Header H2
+      if (trimmed.startsWith('##')) {
+        blocks.push(
+          <h2 key={index} className="text-xl font-black text-slate-950 mt-8 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center gap-2">
+            <Sparkles size={20} className="text-[var(--color-accent-2)]" />
+            {parseStrongText(trimmed.replace('##', '').trim())}
+          </h2>
+        );
+        return;
+      }
+
+      // Regular paragraph
+      blocks.push(
+        <p key={index} className="leading-relaxed text-sm text-slate-700 my-2">
+          {parseStrongText(trimmed)}
+        </p>
+      );
+    });
+
+    if (currentList) {
+      blocks.push(currentList);
+    }
+
     return (
       <div className="space-y-4 text-slate-800 font-medium">
-        {lines.map((line, index) => {
-          const trimmed = line.trim();
-
-          if (!trimmed) return <div key={index} className="h-2" />;
-
-          // 대제목 H1/H2
-          if (trimmed.startsWith('###')) {
+        {blocks.map((block) => {
+          if (block && block.type === 'ul') {
             return (
-              <h3 key={index} className="text-lg font-black text-slate-900 mt-6 mb-3 flex items-center gap-2 border-b border-slate-200 pb-2">
-                <Brain size={18} className="text-[var(--color-accent-1)]" />
-                {parseStrongText(trimmed.replace('###', '').trim())}
-              </h3>
-            );
-          }
-          if (trimmed.startsWith('##')) {
-            return (
-              <h2 key={index} className="text-xl font-black text-slate-950 mt-8 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center gap-2">
-                <Sparkles size={20} className="text-[var(--color-accent-2)]" />
-                {parseStrongText(trimmed.replace('##', '').trim())}
-              </h2>
-            );
-          }
-
-          // 리스트 항목
-          if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
-            return (
-              <ul key={index} className="list-disc pl-6 space-y-1.5">
-                <li className="leading-relaxed text-sm text-slate-800">
-                  {parseStrongText(trimmed.substring(1).trim())}
-                </li>
+              <ul key={block.key} className="list-disc pl-6 space-y-1.5 my-2">
+                {block.items}
               </ul>
             );
           }
-
-          // 번호 매기기 리스트
-          if (/^\d+\./.test(trimmed)) {
-            return (
-              <div key={index} className="pl-2 py-1 flex gap-2 items-start text-sm leading-relaxed text-slate-800">
-                <span className="font-black text-[var(--color-accent-2)] min-w-[20px]">{trimmed.match(/^\d+\./)[0]}</span>
-                <p className="flex-1">{parseStrongText(trimmed.replace(/^\d+\./, '').trim())}</p>
-              </div>
-            );
-          }
-
-          // 일반 단락
-          return (
-            <p key={index} className="leading-relaxed text-sm text-slate-700 my-2">
-              {parseStrongText(trimmed)}
-            </p>
-          );
+          return block;
         })}
       </div>
     );
