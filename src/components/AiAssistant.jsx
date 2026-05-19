@@ -270,7 +270,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
       setAiResponse(outputText);
     } catch (err) {
       console.error('Gemini API 통신 에러:', err);
-      setAiResponse(`❌ **AI 어시스턴트 통신 실패**\n\n이유: ${err.message}\n\n*해결 팁: 입력하신 API Key가 만료되었거나 올바르지 않은지 우측 상단 'API Key 설정'에서 다시 체크해 주시기 바랍니다.*`);
+      setAiResponse(`❌ **AI 어시스턴트 통신 실패**\n\n이유: ${err.message}\n\n*해결 팁: Supabase 데이터베이스의 app_settings 테이블에 gemini_api_key가 올바르게 등록되어 있거나 로컬 .env 파일의 VITE_GEMINI_API_KEY 설정이 올바른지 확인해 주시기 바랍니다.*`);
     } finally {
       setLoading(false);
     }
@@ -500,7 +500,7 @@ ${myNegStr}
 
     const lines = aiResponse.split('\n');
     return (
-      <div className="space-y-4 text-slate-100 font-medium">
+      <div className="space-y-4 text-slate-800 font-medium">
         {lines.map((line, index) => {
           const trimmed = line.trim();
 
@@ -509,7 +509,7 @@ ${myNegStr}
           // 대제목 H1/H2
           if (trimmed.startsWith('###')) {
             return (
-              <h3 key={index} className="text-lg font-black text-white mt-6 mb-3 flex items-center gap-2 border-b border-white/10 pb-2">
+              <h3 key={index} className="text-lg font-black text-slate-900 mt-6 mb-3 flex items-center gap-2 border-b border-slate-200 pb-2">
                 <Brain size={18} className="text-[var(--color-accent-1)]" />
                 {parseStrongText(trimmed.replace('###', '').trim())}
               </h3>
@@ -517,7 +517,7 @@ ${myNegStr}
           }
           if (trimmed.startsWith('##')) {
             return (
-              <h2 key={index} className="text-xl font-black text-white mt-8 mb-4 bg-white/5 p-3 rounded-xl border border-white/10 flex items-center gap-2">
+              <h2 key={index} className="text-xl font-black text-slate-950 mt-8 mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200/60 flex items-center gap-2">
                 <Sparkles size={20} className="text-[var(--color-accent-2)]" />
                 {parseStrongText(trimmed.replace('##', '').trim())}
               </h2>
@@ -528,7 +528,7 @@ ${myNegStr}
           if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
             return (
               <ul key={index} className="list-disc pl-6 space-y-1.5">
-                <li className="leading-relaxed text-sm text-slate-100">
+                <li className="leading-relaxed text-sm text-slate-800">
                   {parseStrongText(trimmed.substring(1).trim())}
                 </li>
               </ul>
@@ -538,7 +538,7 @@ ${myNegStr}
           // 번호 매기기 리스트
           if (/^\d+\./.test(trimmed)) {
             return (
-              <div key={index} className="pl-2 py-1 flex gap-2 items-start text-sm leading-relaxed text-slate-100">
+              <div key={index} className="pl-2 py-1 flex gap-2 items-start text-sm leading-relaxed text-slate-800">
                 <span className="font-black text-[var(--color-accent-2)] min-w-[20px]">{trimmed.match(/^\d+\./)[0]}</span>
                 <p className="flex-1">{parseStrongText(trimmed.replace(/^\d+\./, '').trim())}</p>
               </div>
@@ -547,7 +547,7 @@ ${myNegStr}
 
           // 일반 단락
           return (
-            <p key={index} className="leading-relaxed text-sm text-slate-200 my-2">
+            <p key={index} className="leading-relaxed text-sm text-slate-700 my-2">
               {parseStrongText(trimmed)}
             </p>
           );
@@ -557,7 +557,7 @@ ${myNegStr}
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto text-slate-800">
       {/* 1. Header Banner */}
       <div className="relative rounded-3xl p-8 overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-white/10 shadow-2xl">
         <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--color-accent-1)]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
@@ -570,11 +570,11 @@ ${myNegStr}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-3 py-1 bg-white/10 text-slate-100 text-xs font-black rounded-full uppercase tracking-wider">
+                <span className="px-3 py-1 bg-white/10 text-white text-xs font-black rounded-full uppercase tracking-wider">
                   {userRole === 'evaluator' ? 'Evaluator Expert' : 'Evaluatee PR Master'}
                 </span>
-                <span className="text-slate-400 text-xs font-bold">|</span>
-                <span className="text-slate-200 text-xs font-bold">{currentYear}년 연도 협상 대응</span>
+                <span className="text-white/40 text-xs font-bold">|</span>
+                <span className="text-white/80 text-xs font-bold">{currentYear}년 연도 협상 대응</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-white mt-1 tracking-tight">
                 AI 협상 전략 어시스턴트
@@ -592,21 +592,21 @@ ${myNegStr}
 
           {/* A. 사원 선택 패널 (평가자용) */}
           {userRole === 'evaluator' && (
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl">
-              <h2 className="text-sm font-black text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+              <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
                 <User size={16} className="text-[var(--color-accent-2)]" />
                 <span>대상 사원 실시간 매핑</span>
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-slate-200 font-bold block mb-2">분석할 사원 선택</label>
+                  <label className="text-xs text-slate-500 font-bold block mb-2">분석할 사원 선택</label>
                   <select
                     value={selectedEmployeeId}
                     onChange={(e) => setSelectedEmployeeId(e.target.value)}
-                    className="w-full px-4 py-3 bg-black/40 border border-white/10 rounded-xl text-white text-sm font-semibold focus:outline-none focus:border-[var(--color-accent-1)] transition-all cursor-pointer"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm font-semibold focus:outline-none focus:border-[var(--color-accent-1)] transition-all cursor-pointer"
                   >
                     {employees.map(emp => (
-                      <option key={emp.id} value={emp.id} className="bg-slate-900 text-white">
+                      <option key={emp.id} value={emp.id} className="bg-white text-slate-800">
                         {emp.name} ({emp.department} / {emp.position})
                       </option>
                     ))}
@@ -614,20 +614,20 @@ ${myNegStr}
                 </div>
 
                 {selectedEmployeeData && selectedEmployeeData.profile && (
-                  <div className="mt-4 p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
-                    <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                      <span className="text-sm font-black text-white">{selectedEmployeeData.profile.name}</span>
-                      <span className="text-xs font-bold text-slate-300">{selectedEmployeeData.profile.position}</span>
+                  <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
+                      <span className="text-sm font-black text-slate-900">{selectedEmployeeData.profile.name}</span>
+                      <span className="text-xs font-bold text-slate-500">{selectedEmployeeData.profile.position}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-slate-400 block">부서</span>
-                        <span className="text-slate-100 font-bold">{selectedEmployeeData.profile.department}</span>
+                        <span className="text-slate-800 font-bold">{selectedEmployeeData.profile.department}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block">이탈 위험</span>
-                        <span className={`font-black uppercase ${selectedEmployeeData.risk?.risk_level === 'HIGH' ? 'text-red-400' :
-                          selectedEmployeeData.risk?.risk_level === 'MEDIUM' ? 'text-yellow-400' : 'text-emerald-400'
+                        <span className={`font-black uppercase ${selectedEmployeeData.risk?.risk_level === 'HIGH' ? 'text-red-500 animate-pulse' :
+                          selectedEmployeeData.risk?.risk_level === 'MEDIUM' ? 'text-amber-500' : 'text-emerald-600'
                           }`}>
                           {selectedEmployeeData.risk?.risk_level || 'SAFE'}
                         </span>
@@ -640,8 +640,8 @@ ${myNegStr}
           )}
 
           {/* B. 데이터 컨텍스트 요약 보드 */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl space-y-6">
-            <h2 className="text-sm font-black text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm space-y-6">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
               <FileText size={16} className="text-[var(--color-accent-1)]" />
               <span>AI 인풋 데이터 컨텍스트</span>
             </h2>
@@ -651,13 +651,13 @@ ${myNegStr}
               selectedEmployeeData ? (
                 <div className="space-y-4">
                   <div>
-                    <span className="text-xs text-slate-400 font-bold block mb-1">최근 연봉 추이 (최대 5년)</span>
-                    <div className="space-y-1 bg-black/20 p-3 rounded-xl border border-white/5 text-[11px] font-mono">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">최근 연봉 추이 (최대 5년)</span>
+                    <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] font-mono">
                       {selectedEmployeeData.history.length > 0 ? (
                         selectedEmployeeData.history.map((h, i) => (
-                          <div key={i} className="flex justify-between text-slate-200">
+                          <div key={i} className="flex justify-between text-slate-700">
                             <span>{h.year}년 ({h.performance_rating})</span>
-                            <span className="font-bold text-slate-100">{h.salary.toLocaleString()}원</span>
+                            <span className="font-bold text-slate-900">{h.salary.toLocaleString()}원</span>
                           </div>
                         ))
                       ) : (
@@ -667,12 +667,12 @@ ${myNegStr}
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-400 font-bold block mb-1">소속 부서 잔여 예산</span>
-                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">소속 부서 잔여 예산</span>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs">
                       {selectedEmployeeData.budget ? (
-                        <div className="flex justify-between text-slate-200 font-bold">
+                        <div className="flex justify-between text-slate-700 font-bold">
                           <span>잔여 / 총 예산</span>
-                          <span className="text-[var(--color-accent-1)]">
+                          <span className="text-indigo-600">
                             {(selectedEmployeeData.budget.total_budget - selectedEmployeeData.budget.spent_budget).toLocaleString()}원 / {selectedEmployeeData.budget.total_budget.toLocaleString()}원
                           </span>
                         </div>
@@ -683,10 +683,10 @@ ${myNegStr}
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-400 font-bold block mb-1">시장 연봉 평균 (동종)</span>
-                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs text-slate-200 font-bold flex justify-between">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">시장 연봉 평균 (동종)</span>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
                       <span>시장 평균값</span>
-                      <span className="text-slate-100">{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.average.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
+                      <span className="text-slate-900">{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.average.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
                     </div>
                   </div>
                 </div>
@@ -698,13 +698,13 @@ ${myNegStr}
               myContextData ? (
                 <div className="space-y-4">
                   <div>
-                    <span className="text-xs text-slate-400 font-bold block mb-1">나의 과거 이력 요약</span>
-                    <div className="space-y-1 bg-black/20 p-3 rounded-xl border border-white/5 text-[11px] font-mono">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">나의 과거 이력 요약</span>
+                    <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] font-mono">
                       {myContextData.history.length > 0 ? (
                         myContextData.history.map((h, i) => (
-                          <div key={i} className="flex justify-between text-slate-200">
+                          <div key={i} className="flex justify-between text-slate-700">
                             <span>{h.year}년 ({h.performance_rating})</span>
-                            <span className="font-bold text-slate-100">{h.salary.toLocaleString()}원</span>
+                            <span className="font-bold text-slate-900">{h.salary.toLocaleString()}원</span>
                           </div>
                         ))
                       ) : (
@@ -714,10 +714,10 @@ ${myNegStr}
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-400 font-bold block mb-1">내 직군 시장 연봉 기준</span>
-                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 text-xs text-slate-200 font-bold flex justify-between">
+                    <span className="text-xs text-slate-500 font-bold block mb-1">내 직군 시장 연봉 기준</span>
+                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
                       <span>시장 평균가</span>
-                      <span className="text-slate-100">{myContextData.benchmark ? myContextData.benchmark.average.toLocaleString() + '원' : '벤치마크 미등록'}</span>
+                      <span className="text-slate-900">{myContextData.benchmark ? myContextData.benchmark.average.toLocaleString() + '원' : '벤치마크 미등록'}</span>
                     </div>
                   </div>
 
@@ -736,8 +736,8 @@ ${myNegStr}
         <div className="lg:col-span-2 space-y-6">
 
           {/* AI 분석 버튼 탭 카드 */}
-          <div className="bg-white/5 border border-white/10 rounded-3xl p-6 shadow-xl backdrop-blur-xl">
-            <h2 className="text-sm font-black text-slate-300 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-sm">
+            <h2 className="text-sm font-black text-slate-800 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Brain size={16} className="text-[var(--color-accent-1)]" />
               <span>실행할 AI 협상 도구 선택</span>
             </h2>
@@ -752,13 +752,13 @@ ${myNegStr}
                       triggerAiAnalysis('recommend');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'recommend'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
                     <TrendingUp size={24} className="text-[var(--color-accent-1)] mb-2" />
-                    <div className="font-black text-sm text-white">AI 추천 연봉 산정</div>
-                    <div className="text-[10px] text-slate-300 mt-1">예산 및 기여도 복합 분석 추천액 도출</div>
+                    <div className={`font-black text-sm ${activeTab === 'recommend' ? 'text-white' : 'text-slate-800'}`}>AI 추천 연봉 산정</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'recommend' ? 'text-slate-200' : 'text-slate-500'}`}>예산 및 기여도 복합 분석 추천액 도출</div>
                   </button>
 
                   <button
@@ -767,13 +767,13 @@ ${myNegStr}
                       triggerAiAnalysis('script');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'script'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
                     <Briefcase size={24} className="text-[var(--color-accent-2)] mb-2" />
-                    <div className="font-black text-sm text-white">1:1 면담 설득 대화집</div>
-                    <div className="text-[10px] text-slate-300 mt-1">사원 성향/요구에 맞춘 면담 대본 빌드</div>
+                    <div className={`font-black text-sm ${activeTab === 'script' ? 'text-white' : 'text-slate-800'}`}>1:1 면담 설득 대화집</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'script' ? 'text-slate-200' : 'text-slate-500'}`}>사원 성향/요구에 맞춘 면담 대본 빌드</div>
                   </button>
 
                   <button
@@ -782,13 +782,13 @@ ${myNegStr}
                       triggerAiAnalysis('retention');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'retention'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
-                    <ShieldAlert size={24} className="text-red-400 mb-2" />
-                    <div className="font-black text-sm text-white">이탈 인재 리텐션안</div>
-                    <div className="text-[10px] text-slate-300 mt-1">핵심 인재 잔류 전략 및 맞춤 보상책</div>
+                    <ShieldAlert size={24} className="text-red-500 mb-2" />
+                    <div className={`font-black text-sm ${activeTab === 'retention' ? 'text-white' : 'text-slate-800'}`}>이탈 인재 리텐션안</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'retention' ? 'text-slate-200' : 'text-slate-500'}`}>핵심 인재 잔류 전략 및 맞춤 보상책</div>
                   </button>
                 </>
               ) : (
@@ -800,13 +800,13 @@ ${myNegStr}
                       triggerAiAnalysis('pr');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'pr'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
                     <FileText size={24} className="text-[var(--color-accent-1)] mb-2" />
-                    <div className="font-black text-sm text-white">나의 성과 자기 PR 초안</div>
-                    <div className="text-[10px] text-slate-300 mt-1">STAR 기법을 적용한 성과 설득서 제작</div>
+                    <div className={`font-black text-sm ${activeTab === 'pr' ? 'text-white' : 'text-slate-800'}`}>나의 성과 자기 PR 초안</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'pr' ? 'text-slate-200' : 'text-slate-500'}`}>STAR 기법을 적용한 성과 설득서 제작</div>
                   </button>
 
                   <button
@@ -815,13 +815,13 @@ ${myNegStr}
                       triggerAiAnalysis('objection');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'objection'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
                     <HelpCircle size={24} className="text-[var(--color-accent-2)] mb-2" />
-                    <div className="font-black text-sm text-white">인사권자 반론 가이드북</div>
-                    <div className="text-[10px] text-slate-300 mt-1">예산동결/밴드제한에 대처하는 모범답변</div>
+                    <div className={`font-black text-sm ${activeTab === 'objection' ? 'text-white' : 'text-slate-800'}`}>인사권자 반론 가이드북</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'objection' ? 'text-slate-200' : 'text-slate-500'}`}>예산동결/밴드제한에 대처하는 모범답변</div>
                   </button>
 
                   <button
@@ -830,13 +830,13 @@ ${myNegStr}
                       triggerAiAnalysis('simulate');
                     }}
                     className={`p-4 rounded-2xl border text-left transition-all ${activeTab === 'simulate'
-                      ? 'bg-gradient-to-br from-indigo-900 to-indigo-950 border-indigo-500 shadow-lg text-white'
-                      : 'bg-white/5 border-white/5 hover:bg-white/10 text-slate-100'
+                      ? 'bg-indigo-900 border-indigo-600 shadow-md text-white'
+                      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 hover:text-slate-900'
                       }`}
                   >
-                    <DollarSign size={24} className="text-emerald-400 mb-2" />
-                    <div className="font-black text-sm text-white">적정 희망연봉 시뮬레이터</div>
-                    <div className="text-[10px] text-slate-300 mt-1">업계 벤치마크 기반 타결 가이드라인</div>
+                    <DollarSign size={24} className="text-emerald-600 mb-2" />
+                    <div className={`font-black text-sm ${activeTab === 'simulate' ? 'text-white' : 'text-slate-800'}`}>적정 희망연봉 시뮬레이터</div>
+                    <div className={`text-[10px] mt-1 ${activeTab === 'simulate' ? 'text-slate-200' : 'text-slate-500'}`}>업계 벤치마크 기반 타결 가이드라인</div>
                   </button>
                 </>
               )}
@@ -844,16 +844,13 @@ ${myNegStr}
           </div>
 
           {/* AI 결과 리포트 출력 창 */}
-          <div className="bg-slate-900/60 border border-white/10 rounded-3xl p-8 shadow-2xl backdrop-blur-2xl min-h-[450px] relative flex flex-col justify-between overflow-hidden">
-            {/* 배경 미세 글로우 */}
-            <div className="absolute top-1/2 left-1/2 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-
+          <div className="bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm min-h-[450px] relative flex flex-col justify-between overflow-hidden">
             <div className="relative">
               {/* 리포트 상단 타이틀 바 */}
-              <div className="flex justify-between items-center pb-4 border-b border-white/10 mb-6">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-200 mb-6">
                 <div className="flex items-center gap-2">
-                  <Brain className="text-[var(--color-accent-1)]" size={20} />
-                  <span className="text-xs font-black text-slate-300 uppercase tracking-widest">AI 전략 분석 리포트 결과</span>
+                  <Brain className="text-indigo-600" size={20} />
+                  <span className="text-xs font-black text-slate-800 uppercase tracking-widest">AI 전략 분석 리포트 결과</span>
                 </div>
                 {aiResponse && !loading && (
                   <button
@@ -866,7 +863,7 @@ ${myNegStr}
                       element.click();
                       document.body.removeChild(element);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-slate-100 transition-all active:scale-95"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all active:scale-95"
                   >
                     <Download size={14} />
                     <span>Markdown 다운로드</span>
@@ -877,32 +874,32 @@ ${myNegStr}
               {/* 1. 로딩 맥동 및 스켈레톤 화면 */}
               {loading ? (
                 <div className="space-y-6 py-6">
-                  <div className="flex items-center gap-3 text-[var(--color-accent-1)] font-extrabold text-sm animate-pulse">
+                  <div className="flex items-center gap-3 text-indigo-600 font-extrabold text-sm animate-pulse">
                     <RefreshCw className="animate-spin" size={18} />
                     <span>AI 컨설턴트가 다중 데이터 컨텍스트를 연산하여 전략을 도출하고 있습니다...</span>
                   </div>
                   <div className="space-y-3">
-                    <div className="h-6 bg-white/5 rounded-lg w-1/3 animate-pulse" />
-                    <div className="h-4 bg-white/5 rounded-lg w-full animate-pulse" />
-                    <div className="h-4 bg-white/5 rounded-lg w-5/6 animate-pulse" />
-                    <div className="h-4 bg-white/5 rounded-lg w-4/5 animate-pulse" />
-                    <div className="h-24 bg-white/5 rounded-2xl w-full animate-pulse mt-4" />
+                    <div className="h-6 bg-slate-100 rounded-lg w-1/3 animate-pulse" />
+                    <div className="h-4 bg-slate-100 rounded-lg w-full animate-pulse" />
+                    <div className="h-4 bg-slate-100 rounded-lg w-5/6 animate-pulse" />
+                    <div className="h-4 bg-slate-100 rounded-lg w-4/5 animate-pulse" />
+                    <div className="h-24 bg-slate-100 rounded-2xl w-full animate-pulse mt-4" />
                   </div>
                 </div>
               ) : aiResponse ? (
                 // 2. 렌더링된 결과 출력
-                <div className="prose prose-invert max-w-none text-slate-100">
+                <div className="prose prose-slate max-w-none text-slate-800">
                   {renderResponseBlocks()}
                 </div>
               ) : (
                 // 3. 대기 화면 (Default)
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
-                  <div className="p-4 bg-white/5 border border-white/5 rounded-3xl text-slate-400">
-                    <Sparkles size={48} />
+                  <div className="p-4 bg-slate-50 border border-slate-150 rounded-3xl text-slate-400">
+                    <Sparkles size={48} className="text-slate-300" />
                   </div>
                   <div>
-                    <h3 className="text-white font-black text-base">분석 대기 중</h3>
-                    <p className="text-slate-300 text-xs max-w-xs mx-auto mt-1 leading-relaxed">
+                    <h3 className="text-slate-800 font-black text-base">분석 대기 중</h3>
+                    <p className="text-slate-500 text-xs max-w-xs mx-auto mt-1 leading-relaxed">
                       상단의 AI 도구 버튼 중 하나를 클릭하시면 Supabase의 실시간 보상 데이터와 연계되어 맞춤 보고서가 도출됩니다.
                     </p>
                   </div>
@@ -911,7 +908,7 @@ ${myNegStr}
             </div>
 
             {/* 하단 미세 서명 */}
-            <div className="mt-8 pt-4 border-t border-white/5 flex justify-between items-center text-[10px] text-slate-400 font-semibold relative">
+            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-semibold relative">
               <span>SalarySync AI Recommendation System v2.5</span>
               <span>Secure Session Binding Enabled</span>
             </div>
