@@ -200,16 +200,17 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
         benchmarkData = bench;
       }
 
-      // 4. 이탈 위험도 (사번 기준 조회로 동명이인 및 비가입자 문제 원천 해결)
+      // 4. 이탈 위험도 (이름 기준 조회)
       let riskData = null;
-      if (employeeNo) {
+      if (finalProfile && finalProfile.full_name) {
         const { data: risk } = await supabase
           .from('risk_assessments')
           .select('*')
-          .eq('employee_id', employeeNo)
+          .eq('employee_name', finalProfile.full_name)
           .maybeSingle();
         riskData = risk;
       }
+
 
       // 5. 부서 잔여 예산 정보 (부서 예산 테이블 컬럼 department_name에 기반하여 조회)
       let budgetData = null;
