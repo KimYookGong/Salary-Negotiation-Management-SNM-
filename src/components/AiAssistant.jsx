@@ -38,6 +38,14 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
   const [myContextData, setMyContextData] = useState(null);
 
   const fetchApiKeyFromDb = async () => {
+    // 1. Vercel 및 로컬 환경변수(VITE_GEMINI_API_KEY) 우선 확인
+    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (envKey) {
+      setApiKey(envKey);
+      return;
+    }
+
+    // 2. 환경변수가 없을 경우에만 Supabase DB에서 조회 (Fallback)
     try {
       const { data, error } = await supabase
         .from('app_settings')
@@ -49,17 +57,9 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 
       if (data && data.value) {
         setApiKey(data.value);
-      } else {
-        const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (envKey) {
-          setApiKey(envKey);
-        }
       }
     } catch (err) {
       console.error('Error fetching API key from DB:', err);
-      // Fallback to env key
-      const envKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (envKey) setApiKey(envKey);
     }
   };
 
@@ -76,91 +76,170 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
     }
   }, [userRole, selectedEmployeeId]);
 
-  // 평가자: 임직원 목록 조회
+  // 평가자: 임직원 목록 조회 (모든 사원 목록을 employees 마스터 테이블에서 로드 및 profiles 병합)
   const fetchEmployeesList = async () => {
     try {
-      const { data, error } = await supabase
+      // 1. employees 마스터 정보와 역사 기록 함께 가져오기
+      const { data: emps, error: empsError } = await supabase
+        .from('employees')
+        .select(`
+          *,
+          employee_history (
+            year,
+            position,
+            salary,
+            performance_rating
+          )
+        `)
+        .order('full_name');
+
+      if (empsError) throw empsError;
+
+      // 2. profiles 정보 추가 조회
+      const { data: profs } = await supabase
         .from('profiles')
-        .select('id, name, department, position')
-        .eq('role', 'evaluatee')
-        .order('name');
-      if (error) throw error;
-      setEmployees(data || []);
+        .select('employee_id, current_salary, position, performance_rating');
+
+      // 3. 최신 직급, 연봉 정보 등을 평탄화(Flatten)
+      const flattenedEmps = emps?.map(emp => {
+        const histories = emp.employee_history || [];
+        const profileInfo = profs?.find(p => p.employee_id === emp.employee_id);
+        
+        // 최신 히스토리 찾기
+        const activeHist = [...histories].sort((a, b) => b.year - a.year)[0];
+        const data = activeHist || {};
+
+        return {
+          id: emp.employee_id, // select 옵션 등에서 사용할 고유 ID를 사번으로 통일
+          employee_id: emp.employee_id,
+          full_name: emp.full_name,
+          department: emp.department,
+          position: data.position || profileInfo?.position || '사원',
+          current_salary: data.salary || profileInfo?.current_salary || 0,
+          performance_rating: data.performance_rating || profileInfo?.performance_rating || '-'
+        };
+      }) || [];
+
+      setEmployees(flattenedEmps);
 
       // 첫 번째 사원 자동 선택
-      if (data && data.length > 0 && !selectedEmployeeId) {
-        setSelectedEmployeeId(data[0].id);
+      if (flattenedEmps.length > 0 && !selectedEmployeeId) {
+        setSelectedEmployeeId(flattenedEmps[0].employee_id);
       }
     } catch (err) {
       console.error('사원 목록 조회 오류:', err);
     }
   };
 
-  // 평가자: 선택된 사원의 연계 맥락 정보 실시간 통합 쿼리
-  const fetchSelectedEmployeeData = async (employeeId) => {
-    if (!employeeId) return;
+  // 평가자: 선택된 사원의 연계 맥락 정보 실시간 통합 쿼리 (사번 employeeNo를 인풋으로 받음)
+  const fetchSelectedEmployeeData = async (employeeNo) => {
+    if (!employeeNo) return;
     setLoading(true);
     try {
-      // 1. 프로필
+      // 1. 프로필 조회 (사번 기준)
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', employeeId)
-        .single();
+        .eq('employee_id', employeeNo)
+        .maybeSingle();
 
-      // 2. 5개년 고과/연봉 히스토리
+      // 만약 profiles 테이블에 해당 사원의 회원가입 프로필이 없다면, employees 마스터 정보에서 조회하여 임시 프로필 객체 생성
+      let finalProfile = profileData;
+      if (!finalProfile) {
+        const { data: empData } = await supabase
+          .from('employees')
+          .select('*')
+          .eq('employee_id', employeeNo)
+          .single();
+
+        if (empData) {
+          finalProfile = {
+            id: null, // 아직 Auth 회원가입이 안 됨
+            employee_id: empData.employee_id,
+            full_name: empData.full_name,
+            department: empData.department,
+            position: '사원',
+            current_salary: 0,
+            performance_rating: '-'
+          };
+        }
+      }
+
+      if (!finalProfile) throw new Error('사원 프로필 및 마스터 정보를 찾을 수 없습니다.');
+
+      // 2. 5개년 고과/연봉 히스토리 (사원 번호(TEXT) 기반 조회)
       const { data: historyData } = await supabase
         .from('employee_history')
         .select('*')
-        .eq('employee_id', employeeId)
+        .eq('employee_id', employeeNo)
         .order('year', { ascending: false });
+
+      // 최신 이력이 존재한다면 프로필 데이터 보정
+      if (historyData && historyData.length > 0 && !profileData) {
+        finalProfile.position = historyData[0].position || finalProfile.position;
+        finalProfile.current_salary = historyData[0].salary || finalProfile.current_salary;
+        finalProfile.performance_rating = historyData[0].performance_rating || finalProfile.performance_rating;
+      }
 
       // 3. 시장 벤치마크 (부서 + 직급 기반)
       let benchmarkData = null;
-      if (profileData) {
+      if (finalProfile.department && finalProfile.position) {
         const { data: bench } = await supabase
           .from('market_benchmarks')
           .select('*')
-          .eq('department', profileData.department)
-          .eq('position', profileData.position)
+          .eq('department', finalProfile.department)
+          .eq('position', finalProfile.position)
           .eq('year', currentYear)
           .maybeSingle();
         benchmarkData = bench;
       }
 
-      // 4. 이탈 위험도
+      // 4. 이탈 위험도 (실제 full_name 컬럼 기반 조회)
       let riskData = null;
-      if (profileData) {
+      if (finalProfile.full_name) {
         const { data: risk } = await supabase
           .from('risk_assessments')
           .select('*')
-          .eq('employee_name', profileData.name)
+          .eq('employee_name', finalProfile.full_name)
           .maybeSingle();
         riskData = risk;
       }
 
-      // 5. 부서 잔여 예산 정보
+      // 5. 부서 잔여 예산 정보 (부서 예산 테이블 컬럼 department_name에 기반하여 조회)
       let budgetData = null;
-      if (profileData) {
+      if (finalProfile.department) {
         const { data: budget } = await supabase
           .from('department_budgets')
           .select('*')
-          .eq('department', profileData.department)
+          .eq('department_name', finalProfile.department)
           .eq('year', currentYear)
           .maybeSingle();
         budgetData = budget;
       }
 
-      // 6. 현재 협상 상태
-      const { data: negotiationData } = await supabase
+      // 6. 현재 협상 상태 (사번 또는 사용자 UUID로 유연하게 조회)
+      let negotiationData = null;
+      const { data: negByNo } = await supabase
         .from('negotiations')
         .select('*')
-        .eq('employee_id', employeeId)
+        .eq('employee_id', employeeNo)
         .eq('year', currentYear)
         .maybeSingle();
+      
+      negotiationData = negByNo;
+
+      if (!negotiationData && finalProfile.id) {
+        const { data: negById } = await supabase
+          .from('negotiations')
+          .select('*')
+          .eq('evaluatee_id', finalProfile.id)
+          .eq('year', currentYear)
+          .maybeSingle();
+        negotiationData = negById;
+      }
 
       setSelectedEmployeeData({
-        profile: profileData,
+        profile: finalProfile,
         history: historyData || [],
         benchmark: benchmarkData,
         risk: riskData,
@@ -303,7 +382,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 
       const budget = selectedEmployeeData.budget;
       const budgetStr = budget ?
-        `- 소속 부서: ${budget.department} (총 예산: ${budget.total_budget.toLocaleString()}원, 소모 예산: ${budget.spent_budget.toLocaleString()}원, 잔여 예산: ${(budget.total_budget - budget.spent_budget).toLocaleString()}원)`
+        `- 소속 부서: ${budget.department_name} (총 예산: ${budget.total_budget.toLocaleString()}원, 소모 예산: ${budget.spent_budget.toLocaleString()}원, 잔여 예산: ${(budget.total_budget - budget.spent_budget).toLocaleString()}원)`
         : '- 부서 예산 미등록 상태입니다.';
 
       const neg = selectedEmployeeData.negotiation;
@@ -317,7 +396,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 평가자(인사권자)가 선택한 특정 사원의 다중 데이터 컨텍스트를 바탕으로, 올해의 **[최적 추천 제안 연봉]**을 도출하고 정밀한 논거 리포트를 작성해 주세요.
 
 [사원 다중 정보 컨텍스트]
-- 이름: ${emp.name} (소속: ${emp.department} / 직급: ${emp.position})
+- 이름: ${emp.full_name} (소속: ${emp.department} / 직급: ${emp.position})
 - 최근 5개년 고과 및 연봉 추이:
 ${historyStr}
 - 소속 부서 예산 현황:
@@ -344,10 +423,10 @@ ${negStr}
       } else if (type === 'script') {
         prompt = `
 당신은 베테랑 인사 부서장 및 비즈니스 협상 코치입니다.
-평가자(인사권자)가 사원 **${emp.name}**과의 1:1 대면 연봉 협상 면담에 즉시 활용할 수 있는 실전용 **[1:1 설득 롤플레잉 스크립트]**를 제작해 주세요.
+평가자(인사권자)가 사원 **${emp.full_name}**과의 1:1 대면 연봉 협상 면담에 즉시 활용할 수 있는 실전용 **[1:1 설득 롤플레잉 스크립트]**를 제작해 주세요.
 
 [사원 정보 컨텍스트]
-- 사원명: ${emp.name} (직급: ${emp.position})
+- 사원명: ${emp.full_name} (직급: ${emp.position})
 - 올해 고과 및 과거 히스토리:
 ${historyStr}
 - 부서 예산 상황 및 시장 벤치마크:
@@ -367,10 +446,10 @@ ${negStr}
       } else if (type === 'retention') {
         prompt = `
 당신은 글로벌 헤드헌팅 펌 출신의 인재 리텐션(Retention) 전략 전문가입니다.
-인재 이탈 위험 정보가 감지된 사원 **${emp.name}**을 조직에 잔류시키기 위한 종합 **[인재 잔류 및 보상 액션플랜 리포트]**를 수립해 주세요.
+인재 이탈 위험 정보가 감지된 사원 **${emp.full_name}**을 조직에 잔류시키기 위한 종합 **[인재 잔류 및 보상 액션플랜 리포트]**를 수립해 주세요.
 
 [사원 맥락 정보]
-- 사원명: ${emp.name} (직급: ${emp.position})
+- 사원명: ${emp.full_name} (직급: ${emp.position})
 - 이탈 위험 정밀 진단:
 ${riskStr}
 - 연봉 및 시장 가치:
@@ -607,7 +686,7 @@ ${myNegStr}
                   >
                     {employees.map(emp => (
                       <option key={emp.id} value={emp.id} className="bg-white text-slate-800">
-                        {emp.name} ({emp.department} / {emp.position})
+                        {emp.full_name} ({emp.department} / {emp.position})
                       </option>
                     ))}
                   </select>
@@ -616,7 +695,7 @@ ${myNegStr}
                 {selectedEmployeeData && selectedEmployeeData.profile && (
                   <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-3">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-200/60">
-                      <span className="text-sm font-black text-slate-900">{selectedEmployeeData.profile.name}</span>
+                      <span className="text-sm font-black text-slate-900">{selectedEmployeeData.profile.full_name}</span>
                       <span className="text-xs font-bold text-slate-500">{selectedEmployeeData.profile.position}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
