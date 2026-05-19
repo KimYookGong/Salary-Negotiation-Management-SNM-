@@ -425,6 +425,18 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
         `- 시장 벤치마크 (최소 연봉: ${bench.min_salary.toLocaleString()}원, 평균 연봉: ${bench.avg_salary.toLocaleString()}원, 최대 연봉: ${bench.max_salary.toLocaleString()}원)`
         : '- 시장 벤치마크 데이터가 시스템에 현재 등록되지 않았습니다.';
 
+      // 시장 평균 대비 격차/인상률 계산
+      let gapStr = '';
+      if (emp && emp.current_salary > 0 && bench && bench.avg_salary > 0) {
+        const diff = bench.avg_salary - emp.current_salary;
+        const percent = ((diff / emp.current_salary) * 100).toFixed(1);
+        gapStr = diff <= 0
+          ? `현재 사원의 연봉은 시장 평균 연봉(${bench.avg_salary.toLocaleString()}원)보다 약 +${Math.abs(percent)}% 높은 수준(시장 우위)입니다.`
+          : `현재 사원의 연봉은 시장 평균 연봉(${bench.avg_salary.toLocaleString()}원)보다 약 -${percent}% 낮은 수준(시장 열위)이며, 시장 평균선에 도달하려면 +${percent}%의 인상률이 적용되어야 합니다.`;
+      } else {
+        gapStr = '현재 사원의 연봉 혹은 시장 평균 연봉 데이터가 불완전하여 분석할 수 없습니다.';
+      }
+
       const risk = selectedEmployeeData.risk;
       const riskStr = risk ?
         `- 이탈 위험 등급: **[${risk.risk_level}]**, 사유: ${risk.reason}`
@@ -446,13 +458,15 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 평가자(인사권자)가 선택한 특정 사원의 다중 데이터 컨텍스트를 바탕으로, 올해의 **[최적 추천 제안 연봉]**을 도출하고 정밀한 논거 리포트를 작성해 주세요.
 
 [사원 다중 정보 컨텍스트]
-- 이름: ${emp.full_name} (소속: ${emp.department} / 직급: ${emp.position})
+- 이름: ${emp.full_name} (소속 부서: ${emp.department} / 직급: ${emp.position})
 - 최근 5개년 고과 및 연봉 추이:
 ${historyStr}
 - 소속 부서 예산 현황:
 ${budgetStr}
 - 동종 업계 시장 벤치마크:
 ${benchStr}
+- 시장 평균 대비 격차 및 요구 인상률:
+${gapStr}
 - 핵심 인재 이탈 위험도:
 ${riskStr}
 - 현재 협상 진행 현황 및 사원 주장:
@@ -462,7 +476,7 @@ ${negStr}
 1. **[최적 AI 추천 제안 연봉]**: 부서 잔여 예산 적합도, 시장 벤치마크 포지셔닝(p25~p75), 과거 고과 추이를 복합 연산하여 구체적인 원화(KRW) 단위 금액과 인상률(%)을 굵은 글씨로 상단에 명시해 주세요. (잔여 예산 한도를 초과하지 않도록 보수성과 리텐션을 조율하십시오.)
 2. **[다차원 근거 분석]**:
    - 고과 기여도 대비 보상 적합성 분석
-   - 시장 시장가치 대비 포지셔닝 타당성
+   - 시장 시장가치 대비 포지셔닝 타당성 (사원의 현재 연봉 및 제시된 시장 벤치마크 평균 대비의 격차 분석 포함)
    - 이탈 위험 방어를 위한 재무적 영향성
 3. **[대안 시나리오 제언]**:
    - 부서 예산 제약이 극심한 경우 차선책으로 제시할 수 있는 비재무적 특수 보상 옵션 (특별 휴가, 교육 기회 제공, 유연근무 우선권 등)
@@ -476,12 +490,14 @@ ${negStr}
 평가자(인사권자)가 사원 **${emp.full_name}**과의 1:1 대면 연봉 협상 면담에 즉시 활용할 수 있는 실전용 **[1:1 설득 롤플레잉 스크립트]**를 제작해 주세요.
 
 [사원 정보 컨텍스트]
-- 사원명: ${emp.full_name} (직급: ${emp.position})
+- 사원명: ${emp.full_name} (소속 부서: ${emp.department} / 직급: ${emp.position})
 - 올해 고과 및 과거 히스토리:
 ${historyStr}
 - 부서 예산 상황 및 시장 벤치마크:
 ${budgetStr}
 ${benchStr}
+- 시장 평균 대비 격차 및 요구 인상률:
+${gapStr}
 - 사원의 요구 요약:
 ${negStr}
 
@@ -489,7 +505,7 @@ ${negStr}
 다음 5단계의 실제 대화 흐름을 "인사권자(말투: 정중함, 단호하면서도 따뜻함)"와 "사원(말투: 조심스러우면서도 자신의 성과를 관철하려 함)"의 티키타카 대화 형식으로 실감 나게 적어주세요.
 1. **오프닝 (Opening)**: 사원의 노고에 깊은 감사 표명 및 면담의 따뜻한 분위기 유도.
 2. **성과 피드백 (Feedback)**: 올해 사원이 올린 실적과 고과 등급에 대한 합당한 객관적 평가 분석 제시.
-3. **제안액 제시 및 근거 공개 (Negotiation)**: 회사가 책정한 인상안을 조심스럽지만 명확하게 제시하고, 부서 예산 한계 및 시장 벤치마크 타당성에 기반하여 합리적임을 설명하는 대화.
+3. **제안액 제시 및 근거 공개 (Negotiation)**: 회사가 책정한 인상안을 조심스럽지만 명확하게 제시하고, 부서 예산 한계 및 시장 벤치마크 평균과의 구체적인 격차 수준(예: 시장 대비 몇 % 하회 혹은 상회)을 인용하여 합리성을 설명하는 대화.
 4. **반론/우려 수용 및 쿠션 격려 (Mitigation)**: 사원이 예산이나 인상폭에 실망감을 드러낼 때, 이를 경청하고 감정적으로 수용하면서도 리텐션(경력 기회 확대, 미래 보장)을 자극하는 모범 쿠션어 스크립트.
 5. **클로징 (Closing)**: 동기부여를 심어주며 기분 좋게 도장을 찍도록 유도하는 약속 맺기.
         `;
@@ -499,17 +515,19 @@ ${negStr}
 인재 이탈 위험 정보가 감지된 사원 **${emp.full_name}**을 조직에 잔류시키기 위한 종합 **[인재 잔류 및 보상 액션플랜 리포트]**를 수립해 주세요.
 
 [사원 맥락 정보]
-- 사원명: ${emp.full_name} (직급: ${emp.position})
+- 사원명: ${emp.full_name} (소속 부서: ${emp.department} / 직급: ${emp.position})
 - 이탈 위험 정밀 진단:
 ${riskStr}
-- 연봉 및 시장 가치:
+- 연봉 및 시장 가치 현황:
 ${historyStr}
 ${benchStr}
+- 시장 평균 대비 격차 분석:
+${gapStr}
 
 [리포트 포함 조건 (Markdown 형식)]
 1. **[이탈 동기 정밀 진단]**: 등록된 리스크 사유를 심리학적, 커리어적 관점에서 분석하여 이 사원이 가장 결핍을 느끼는 근본 요소를 진단해 주세요.
 2. **[맞춤형 잔류 처방전 (3 Core Cards)]**:
-   - **재무적 특별 카드**: 일시적 인센티브, 내년도 보장 인상율, 스톡옵션 등 적용 가능한 재무 처방.
+   - **재무적 특별 카드**: 일시적 인센티브, 내년도 보장 인상율, 스톡옵션 등 적용 가능한 재무 처방 (특히 현재 시장 평균 연봉 대비 몇 % 격차가 나는지에 맞춰 이를 보전해 주기 위한 점진적 재무 로드맵 제안).
    - **커리어 및 직무 카드**: 사원이 원하는 R&R 조정, 상위 포지션 조기 배정 가능성, 특별 직무 교육 예산 배정.
    - **조직 문화 및 정서적 케어**: 멘토링 매칭, 리더십과의 1:1 대화 정례화, 심리적 안정감을 심어주는 면담 약속.
 3. **[향후 6개월 밀착 모니터링 가이드라인]**: 매월 체크해야 할 리스크 시그널과 예방적 피드백 주기 설계.
@@ -528,6 +546,20 @@ ${benchStr}
         `- 부서/직급 시장 벤치마크 (최소 연봉: ${myBench.min_salary.toLocaleString()}원, 평균 연봉: ${myBench.avg_salary.toLocaleString()}원, 최대 연봉: ${myBench.max_salary.toLocaleString()}원)`
         : '- 시장 벤치마크 데이터가 등록되지 않았습니다.';
 
+      // 시장 평균 대비 격차/인상률 계산 (피평가자용)
+      let myGapStr = '';
+      const myCurrent = profile.current_salary || 0;
+      const myMarketAvg = myBench ? myBench.avg_salary : 0;
+      if (myCurrent > 0 && myMarketAvg > 0) {
+        const diff = myMarketAvg - myCurrent;
+        const percent = ((diff / myCurrent) * 100).toFixed(1);
+        myGapStr = diff <= 0
+          ? `현재 내 연봉은 시장 평균 연봉(${myMarketAvg.toLocaleString()}원)보다 약 +${Math.abs(percent)}% 높은 수준(시장 우위)입니다.`
+          : `현재 내 연봉은 시장 평균 연봉(${myMarketAvg.toLocaleString()}원)보다 약 -${percent}% 낮은 수준(시장 열위)이며, 시장 평균선에 도달하려면 +${percent}%의 인상률이 더 필요한 상태입니다.`;
+      } else {
+        myGapStr = '현재 내 연봉 혹은 시장 평균 연봉 데이터가 불완전하여 분석할 수 없습니다.';
+      }
+
       const myNeg = myContextData?.negotiation;
       const myNegStr = myNeg ?
         `- 내가 제안한 희망 연봉: **${myNeg.proposed_salary ? myNeg.proposed_salary.toLocaleString() + '원' : '미정'}**\n- 내가 기재한 성과 요약:\n"${myNeg.evaluatee_comment || '미작성'}"`
@@ -542,6 +574,9 @@ ${benchStr}
 - 내 이름: ${profile.name} (소속 부서: ${profile.department} / 직급: ${profile.position})
 - 나의 연봉/고과 히스토리:
 ${myHistoryStr}
+- 시장 벤치마크 및 나의 시장 내 위상:
+${myBenchStr}
+${myGapStr}
 - 나의 기작성 성과 요약 및 희망 요구안:
 ${myNegStr}
 
@@ -552,7 +587,7 @@ ${myNegStr}
    - **T (Task)**: 그 안에서 나에게 주어졌던 구체적인 미션과 과업.
    - **A (Action)**: 내가 리더십을 발휘하여 주도적으로 실행한 전문적 대책 및 문제 해결 과정 (수치 중심).
    - **R (Result)**: 나의 액션으로 인해 발생한 구체적인 비즈니스 성과와 가치 창출 (전년비 % 상승, 비용 절감액 등 정량화).
-3. **[미래 성장 기여도 및 로드맵]**: 인상된 연봉을 승인받았을 때, 내년에 회사에 돌려줄 200%의 가치 창출 계획 및 R&R 확장 약속.
+3. **[미래 성장 기여도 및 로드맵]**: 인상된 연봉을 승인받았을 때, 내년에 회사에 돌려줄 200%의 가치 창출 계획 및 R&R 확장 약속 (특히 내 연봉이 시장 평균 대비 어떤 상황인지를 기반으로 타당성을 은유적으로 녹여내십시오).
         `;
       } else if (type === 'objection') {
         prompt = `
@@ -560,15 +595,16 @@ ${myNegStr}
 인사권자(평가자)가 연봉 협상 테이블에서 단골로 꺼내는 거절/삭감 핑계에 대해, 사원이 기분을 상하게 하지 않으면서 자신의 정당한 가치를 입증하고 논리적으로 역제안할 수 있는 **[인사권자 3대 단골 거절 반론 가이드북]**을 집필해 주세요.
 
 [나의 맥락 상황]
-- 사원: ${profile.name} (${profile.position})
-- 올해 나의 성과 요약 및 시장 벤치마크:
+- 사원: ${profile.name} (소속 부서: ${profile.department} / 직급: ${profile.position})
+- 올해 나의 성과 요약 및 시장 벤치마크 위상:
 ${myNegStr}
 ${myBenchStr}
+${myGapStr}
 
 [가이드북 포함 구조 (Markdown 형식)]
 다음 3대 거절 상황 각각에 대해 ① **인사권자의 핑계 멘트**, ② **대응 핵심 로직(Do's & Don'ts)**, ③ **실전 즉시 활용 가능한 모범 말하기 스크립트**를 구체적 구어체로 제공해 주세요.
 - **상황 1: [회사/부서 예산 동결로 인해 인상이 곤란하다는 핑계]** (대처법: 비재무적 보상 결합안 및 향후 성과 연동 인센티브 약속 역제안 등)
-- **상황 2: [내부 동료들과의 형평성 및 회사 연봉 밴드 테이블 제한 핑계]** (대처법: 시장 벤치마크 데이터 인용 및 내 직급 이상의 R&R 소화 증명을 통한 밴드 예외 적용 근거 대화법)
+- **상황 2: [내부 동료들과의 형평성 및 회사 연봉 밴드 테이블 제한 핑계]** (대처법: 내 직무/직급의 시장 벤치마크 평균 대비 현재 내 격차 수준(예: 현재 시장보다 몇 % 하회하고 있음을 언급)을 이성적 근거로 대화하는 법)
 - **상황 3: [올해 성과는 좋으나 요구한 인상폭이 평균 대비 너무 과하다는 핑계]** (대처법: 기여 성과의 정량화 가치 대비 보상 비중 계산법 및 협의 양보선 제시 조율 방법)
         `;
       } else if (type === 'simulate') {
@@ -578,18 +614,19 @@ ${myBenchStr}
 
 [나의 지표 컨텍스트]
 - 내 직무 및 직급: ${profile.department} / ${profile.position}
-- 시장 벤치마크 분위수 현황:
+- 시장 벤치마크 분위수 현황 및 격차:
 ${myBenchStr}
+${myGapStr}
 - 나의 고과 이력 및 현재 연봉:
 ${myHistoryStr}
 - 나의 요구 희망안:
 ${myNegStr}
 
 [시뮬레이션 결과 리포트 구조 (Markdown 형식)]
-1. **[올해 나의 시장 가치 백분위(Percentile) 진단]**: 벤치마크 데이터 대비 현재 내 연봉이 시장의 하위, 중위, 상위 어디에 포지셔닝되어 있는지 정밀 계산하여 피드백해 주세요.
+1. **[올해 나의 시장 가치 백분위(Percentile) 진단]**: 벤치마크 데이터 및 시장 평균 대비 내 연봉의 격차(%)를 기반으로, 현재 내 연봉이 시장의 하위, 중위, 상위 어디에 포지셔닝되어 있는지 정밀 계산하여 피드백해 주세요.
 2. **[AI 추천 3대 협상 Target Line 제안]**:
    - **A. 공세적 도전선 (Max Target)**: 뛰어난 고과와 높은 시장가치를 입증할 때 지향할 수 있는 최대 타겟 금액 (인상률 포함).
-   - **B. 합리적 타결선 (Sweet Spot)**: 인사권자가 예산 한도 내에서 현실적으로 고개를 끄덕일 가능성이 가장 높은 최적의 합의 금액.
+   - **B. 합리적 타결선 (Sweet Spot)**: 인사권자가 예산 한도 내에서 현실적으로 고개를 끄덕일 가능성이 가장 높은 최적의 합의 금액 (시장 평균선 수렴 전략).
    - **C. 마지노 방어선 (Min Target)**: 이직이나 커리어의 불만을 방지하기 위해 최소한으로 방어해야 할 최소 인상선.
 3. **[구체적인 목표선별 연계 협상 포지셔닝 전략 가이드]**
         `;
@@ -599,7 +636,70 @@ ${myNegStr}
     callGemini(prompt);
   };
 
-  // --- 5. 마크다운 파서 및 예쁜 뱃지 스타일 렌더러 ---
+  // --- 5. 시장 벤치마크 및 인상률/격차 시각화 블록 ---
+  const renderMarketCompareBlock = (profile, benchmark) => {
+    if (!profile || !benchmark || !benchmark.avg_salary) {
+      return (
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-slate-400 text-center py-4 text-xs font-bold">
+          시장 평균 대비 데이터 분석 불가 (연봉/벤치마크 누락)
+        </div>
+      );
+    }
+
+    const current = profile.current_salary;
+    const marketAvg = benchmark.avg_salary;
+    const team = profile.department;
+    const pos = profile.position;
+
+    if (!current || current === 0) {
+      return (
+        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2">
+          <div className="flex justify-between text-xs font-bold text-slate-700">
+            <span>대상 분류</span>
+            <span className="text-indigo-600 font-extrabold">{team} / {pos}</span>
+          </div>
+          <div className="flex justify-between text-xs font-bold text-slate-700">
+            <span>시장 평균 연봉</span>
+            <span className="text-slate-900 font-extrabold">{marketAvg.toLocaleString()}원</span>
+          </div>
+          <div className="text-[10px] text-slate-400 text-center font-bold pt-2 border-t border-slate-150">
+            현재 연봉 정보가 입력되지 않아 격차 계산이 불가합니다.
+          </div>
+        </div>
+      );
+    }
+
+    const diff = marketAvg - current;
+    const percent = ((diff / current) * 100).toFixed(1);
+    const isAbove = diff <= 0;
+
+    return (
+      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3 shadow-inner">
+        <div className="flex justify-between text-xs font-bold text-slate-700">
+          <span>대상 분류</span>
+          <span className="text-indigo-600 font-extrabold">{team} / {pos}</span>
+        </div>
+        <div className="flex justify-between text-xs font-bold text-slate-700">
+          <span>시장 평균 연봉</span>
+          <span className="text-slate-900 font-extrabold">{marketAvg.toLocaleString()}원</span>
+        </div>
+        <div className="flex justify-between items-center text-xs font-bold pt-2 border-t border-slate-200/60">
+          <span>시장 평균 대비 격차</span>
+          {isAbove ? (
+            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black border border-emerald-200 uppercase tracking-tight">
+              +{Math.abs(percent)}% 상회 중
+            </span>
+          ) : (
+            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-lg text-[10px] font-black border border-rose-200 animate-pulse uppercase tracking-tight">
+              +{percent}% 인상 필요
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // --- 6. 마크다운 파서 및 예쁜 뱃지 스타일 렌더러 ---
   const parseStrongText = (text) => {
     if (!text) return '';
 
@@ -871,11 +971,8 @@ ${myNegStr}
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-500 font-bold block mb-1">시장 연봉 평균 (동종)</span>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
-                      <span>시장 평균값</span>
-                      <span className="text-slate-900">{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.avg_salary.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-bold block mb-2">시장 벤치마크 분석 (동종 직무/직급)</span>
+                    {renderMarketCompareBlock(selectedEmployeeData.profile, selectedEmployeeData.benchmark)}
                   </div>
                 </div>
               ) : (
@@ -902,11 +999,8 @@ ${myNegStr}
                   </div>
 
                   <div>
-                    <span className="text-xs text-slate-500 font-bold block mb-1">내 직군 시장 연봉 기준</span>
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
-                      <span>시장 평균가</span>
-                      <span className="text-slate-900">{myContextData.benchmark ? myContextData.benchmark.avg_salary.toLocaleString() + '원' : '벤치마크 미등록'}</span>
-                    </div>
+                    <span className="text-xs text-slate-500 font-bold block mb-2">내 직무/직급 시장 벤치마크 분석</span>
+                    {renderMarketCompareBlock(myContextData.profile, myContextData.benchmark)}
                   </div>
 
                   <div className="p-3 bg-[var(--color-accent-1)]/10 rounded-xl border border-[var(--color-accent-1)]/20 text-xs text-[var(--color-accent-1)] leading-relaxed font-semibold">
