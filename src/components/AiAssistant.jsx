@@ -38,7 +38,16 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
   const [myContextData, setMyContextData] = useState(null);
 
   const fetchApiKeyFromDb = async () => {
-    // 1. Supabase DB에서 최신 등록된 실시간 API Key를 1순위로 즉시 조회 (동적 실시간 갱신 보장)
+    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+    const isLocal = import.meta.env.DEV; // Vite 로컬 개발 여부 감지
+
+    // 1. 로컬 개발 환경(localhost)인 경우, .env 파일의 변경사항을 최우선으로 즉시 반영
+    if (isLocal && envKey) {
+      setApiKey(envKey);
+      return;
+    }
+
+    // 2. 프로덕션(Vercel) 배포 환경인 경우, 재배포 없이 실시간 업데이트가 가능한 Supabase DB를 1순위로 조회
     try {
       const { data, error } = await supabase
         .from('app_settings')
@@ -54,8 +63,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
       console.error('Error fetching API key from DB, falling back to env:', err);
     }
 
-    // 2. DB에 등록되지 않았을 경우에만 Vercel 및 로컬 환경변수(VITE_GEMINI_API_KEY)를 Fallback(2순위)으로 확인
-    const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+    // 3. 최종 Fallback으로 Vercel 환경변수 참조
     if (envKey) {
       setApiKey(envKey);
     }
