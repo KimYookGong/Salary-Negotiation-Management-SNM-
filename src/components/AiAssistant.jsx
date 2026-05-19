@@ -327,14 +327,16 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
   };
 
   // --- 3. Gemini Flash API 통신 모듈 (Direct fetch) ---
-  const callGemini = async (prompt) => {
+  const callGemini = async (prompt, retryCount = 0) => {
     if (!apiKey) {
       alert('AI 기능을 이용하기 위한 시스템 마스터 AI API Key가 설정되지 않았습니다. 관리자에게 문의하여 Supabase DB에 gemini_api_key 설정을 등록해 주세요.');
       return;
     }
 
     setLoading(true);
-    setAiResponse('');
+    if (retryCount === 0) setAiResponse(''); // 첫 호출 시에만 초기화
+    const maxRetries = 3;
+
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
@@ -362,8 +364,19 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || 'API 호출 오류');
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `API 호출 오류 (Status: ${response.status})`;
+        
+        // 429 Too Many Requests 또는 503 Service Unavailable 인 경우 재시도
+        if ((response.status === 429 || response.status === 503) && retryCount < maxRetries) {
+          console.warn(`API rate limit/error (Status ${response.status}). Retrying... (${retryCount + 1}/${maxRetries})`);
+          // 지수 백오프: 1초, 2초, 4초... + 약간의 랜덤 지연
+          const delay = Math.pow(2, retryCount) * 1000 + Math.random() * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return callGemini(prompt, retryCount + 1); // 재귀 호출 후 리턴
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -375,9 +388,20 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
       setAiResponse(outputText);
     } catch (err) {
       console.error('Gemini API 통신 에러:', err);
-      setAiResponse(`❌ **AI 어시스턴트 통신 실패**\n\n이유: ${err.message}\n\n*해결 팁: Supabase 데이터베이스의 app_settings 테이블에 gemini_api_key가 올바르게 등록되어 있거나 로컬 .env 파일의 VITE_GEMINI_API_KEY 설정이 올바른지 확인해 주시기 바랍니다.*`);
+      
+      // 사용자 친화적인 에러 메시지로 변환
+      let friendlyMessage = err.message;
+      if (err.message.includes('Too Many Requests') || err.message.includes('429')) {
+        friendlyMessage = '현재 AI 서버 사용량이 폭주하여 일시적으로 지연되었습니다. 잠시 후 다시 시도해 주세요.';
+      } else if (err.message.includes('503')) {
+         friendlyMessage = 'AI 서버가 일시적으로 점검 중이거나 불안정합니다. 잠시 후 다시 시도해 주세요.';
+      }
+      
+      setAiResponse(`❌ **AI 어시스턴트 통신 실패**\n\n이유: ${friendlyMessage}\n\n*해결 팁: 잠시 후 상단의 분석 버튼을 다시 클릭해 주시기 바랍니다. 문제가 지속될 경우 시스템 관리자에게 문의하세요.*`);
     } finally {
-      setLoading(false);
+      if (retryCount === 0 || aiResponse) {
+        setLoading(false); // 재귀 호출의 최종 단계에서만 로딩 종료
+      }
     }
   };
 
