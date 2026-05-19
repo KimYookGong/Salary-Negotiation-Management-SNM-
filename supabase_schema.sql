@@ -368,3 +368,8 @@ USING (
     WHERE profiles.id = auth.uid() AND profiles.role = 'evaluator'
   )
 );
+
+INSERT INTO app_settings (key, value)
+VALUES ('gemini_api_key', 'YOUR_GEMINI_API_KEY')
+ON CONFLICT (key) 
+DO UPDATE SET value = EXCLUDED.value, updated_at = NOW();
