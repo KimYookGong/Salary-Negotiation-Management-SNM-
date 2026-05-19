@@ -194,13 +194,13 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
         benchmarkData = bench;
       }
 
-      // 4. 이탈 위험도 (실제 full_name 컬럼 기반 조회)
+      // 4. 이탈 위험도 (사번 기준 조회로 동명이인 및 비가입자 문제 원천 해결)
       let riskData = null;
-      if (finalProfile.full_name) {
+      if (employeeNo) {
         const { data: risk } = await supabase
           .from('risk_assessments')
           .select('*')
-          .eq('employee_name', finalProfile.full_name)
+          .eq('employee_id', employeeNo)
           .maybeSingle();
         riskData = risk;
       }
@@ -264,14 +264,20 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
     if (!profile) return;
     setLoading(true);
     try {
-      // 1. 과거 히스토리
-      const { data: historyData } = await supabase
-        .from('employee_history')
-        .select('*')
-        .eq('employee_id', profile.id)
-        .order('year', { ascending: false });
+      const myEmpNo = profile.employee_id; // 사번 (TEXT)
 
-      // 2. 본인의 시장 벤치마크
+      // 1. 과거 히스토리 (사번 기준 조회)
+      let historyData = [];
+      if (myEmpNo) {
+        const { data: hist } = await supabase
+          .from('employee_history')
+          .select('*')
+          .eq('employee_id', myEmpNo)
+          .order('year', { ascending: false });
+        historyData = hist || [];
+      }
+
+      // 2. 본인의 시장 벤치마크 (부서 + 직급 기준)
       const { data: benchmarkData } = await supabase
         .from('market_benchmarks')
         .select('*')
@@ -280,13 +286,27 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
         .eq('year', currentYear)
         .maybeSingle();
 
-      // 3. 기작성한 협상안 정보 (성과요약 및 요구조건)
-      const { data: negotiationData } = await supabase
-        .from('negotiations')
-        .select('*')
-        .eq('employee_id', profile.id)
-        .eq('year', currentYear)
-        .maybeSingle();
+      // 3. 기작성한 협상안 정보 (사번 또는 UUID 기준 유연하게 조회)
+      let negotiationData = null;
+      if (myEmpNo) {
+        const { data: neg } = await supabase
+          .from('negotiations')
+          .select('*')
+          .eq('employee_id', myEmpNo)
+          .eq('year', currentYear)
+          .maybeSingle();
+        negotiationData = neg;
+      }
+
+      if (!negotiationData && profile.id) {
+        const { data: negById } = await supabase
+          .from('negotiations')
+          .select('*')
+          .eq('evaluatee_id', profile.id)
+          .eq('year', currentYear)
+          .maybeSingle();
+        negotiationData = negById;
+      }
 
       setMyContextData({
         history: historyData || [],
@@ -300,7 +320,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
     }
   };
 
-  // --- 3. Gemini 2.5 Flash API 통신 모듈 (Direct fetch) ---
+  // --- 3. Gemini Flash API 통신 모듈 (Direct fetch) ---
   const callGemini = async (prompt) => {
     if (!apiKey) {
       alert('AI 기능을 이용하기 위한 시스템 마스터 AI API Key가 설정되지 않았습니다. 관리자에게 문의하여 Supabase DB에 gemini_api_key 설정을 등록해 주세요.');
@@ -311,7 +331,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
     setAiResponse('');
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -372,7 +392,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 
       const bench = selectedEmployeeData.benchmark;
       const benchStr = bench ?
-        `- 시장 벤치마크 (25% 분위: ${bench.p25.toLocaleString()}원, 평균: ${bench.average.toLocaleString()}원, 75% 분위: ${bench.p75.toLocaleString()}원)`
+        `- 시장 벤치마크 (최소 연봉: ${bench.min_salary.toLocaleString()}원, 평균 연봉: ${bench.avg_salary.toLocaleString()}원, 최대 연봉: ${bench.max_salary.toLocaleString()}원)`
         : '- 시장 벤치마크 데이터가 시스템에 현재 등록되지 않았습니다.';
 
       const risk = selectedEmployeeData.risk;
@@ -382,7 +402,7 @@ export default function AiAssistant({ profile, userRole, currentYear }) {
 
       const budget = selectedEmployeeData.budget;
       const budgetStr = budget ?
-        `- 소속 부서: ${budget.department_name} (총 예산: ${budget.total_budget.toLocaleString()}원, 소모 예산: ${budget.spent_budget.toLocaleString()}원, 잔여 예산: ${(budget.total_budget - budget.spent_budget).toLocaleString()}원)`
+        `- 소속 부서: ${budget.department_name} (총 예산: ${budget.total_budget.toLocaleString()}원, 소모 예산: ${budget.used_budget.toLocaleString()}원, 잔여 예산: ${(budget.total_budget - budget.used_budget).toLocaleString()}원)`
         : '- 부서 예산 미등록 상태입니다.';
 
       const neg = selectedEmployeeData.negotiation;
@@ -475,7 +495,7 @@ ${benchStr}
 
       const myBench = myContextData?.benchmark;
       const myBenchStr = myBench ?
-        `- 부서/직급 시장 벤치마크 (25% 분위: ${myBench.p25.toLocaleString()}원, 평균: ${myBench.average.toLocaleString()}원, 75% 분위: ${myBench.p75.toLocaleString()}원)`
+        `- 부서/직급 시장 벤치마크 (최소 연봉: ${myBench.min_salary.toLocaleString()}원, 평균 연봉: ${myBench.avg_salary.toLocaleString()}원, 최대 연봉: ${myBench.max_salary.toLocaleString()}원)`
         : '- 시장 벤치마크 데이터가 등록되지 않았습니다.';
 
       const myNeg = myContextData?.negotiation;
@@ -705,8 +725,9 @@ ${myNegStr}
                       </div>
                       <div>
                         <span className="text-slate-400 block">이탈 위험</span>
-                        <span className={`font-black uppercase ${selectedEmployeeData.risk?.risk_level === 'HIGH' ? 'text-red-500 animate-pulse' :
-                          selectedEmployeeData.risk?.risk_level === 'MEDIUM' ? 'text-amber-500' : 'text-emerald-600'
+                        <span className={`font-black uppercase ${
+                          selectedEmployeeData.risk?.risk_level?.toUpperCase() === 'HIGH' ? 'text-red-500 animate-pulse' :
+                          selectedEmployeeData.risk?.risk_level?.toUpperCase() === 'MEDIUM' ? 'text-amber-500' : 'text-emerald-600'
                           }`}>
                           {selectedEmployeeData.risk?.risk_level || 'SAFE'}
                         </span>
@@ -752,7 +773,7 @@ ${myNegStr}
                         <div className="flex justify-between text-slate-700 font-bold">
                           <span>잔여 / 총 예산</span>
                           <span className="text-indigo-600">
-                            {(selectedEmployeeData.budget.total_budget - selectedEmployeeData.budget.spent_budget).toLocaleString()}원 / {selectedEmployeeData.budget.total_budget.toLocaleString()}원
+                            {(selectedEmployeeData.budget.total_budget - selectedEmployeeData.budget.used_budget).toLocaleString()}원 / {selectedEmployeeData.budget.total_budget.toLocaleString()}원
                           </span>
                         </div>
                       ) : (
@@ -765,7 +786,7 @@ ${myNegStr}
                     <span className="text-xs text-slate-500 font-bold block mb-1">시장 연봉 평균 (동종)</span>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
                       <span>시장 평균값</span>
-                      <span className="text-slate-900">{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.average.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
+                      <span className="text-slate-900">{selectedEmployeeData.benchmark ? selectedEmployeeData.benchmark.avg_salary.toLocaleString() + '원' : '벤치마크 데이터 없음'}</span>
                     </div>
                   </div>
                 </div>
@@ -796,7 +817,7 @@ ${myNegStr}
                     <span className="text-xs text-slate-500 font-bold block mb-1">내 직군 시장 연봉 기준</span>
                     <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-bold flex justify-between">
                       <span>시장 평균가</span>
-                      <span className="text-slate-900">{myContextData.benchmark ? myContextData.benchmark.average.toLocaleString() + '원' : '벤치마크 미등록'}</span>
+                      <span className="text-slate-900">{myContextData.benchmark ? myContextData.benchmark.avg_salary.toLocaleString() + '원' : '벤치마크 미등록'}</span>
                     </div>
                   </div>
 
